@@ -11,7 +11,10 @@ import os
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Iterator, Mapping, cast
+from typing import Any, Iterable, Iterator, Mapping, cast
+
+import numpy as np
+import pandas as pd
 
 DEFAULT_EXPERIMENT = "river-morphology"
 DEFAULT_TRACKING_URI = "file:./mlruns"
@@ -112,6 +115,85 @@ def enable_keras_autolog(log_models: bool = False) -> None:
     mlflow.tensorflow.autolog(log_models=log_models, silent=True)
 
 
+def write_error_analysis(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    sample_ids: Iterable[Any],
+    output_path: str | Path,
+    threshold: float = 0.5,
+) -> Path:
+    """Write per-sample IoU, Dice, and pixel-error diagnostics to CSV."""
+    true = np.asarray(y_true)
+    pred = np.asarray(y_pred)
+    identifiers = list(sample_ids)
+    if true.shape != pred.shape or true.ndim < 2:
+        raise ValueError("y_true and y_pred must have matching batch-shaped arrays")
+    if len(identifiers) != len(true):
+        raise ValueError("sample_ids must match the prediction batch length")
+
+    rows = []
+    for identifier, target, prediction in zip(identifiers, true, pred):
+        target_mask = np.asarray(target) > threshold
+        prediction_mask = np.asarray(prediction) > threshold
+        intersection = np.logical_and(target_mask, prediction_mask).sum()
+        union = np.logical_or(target_mask, prediction_mask).sum()
+        target_count = target_mask.sum()
+        prediction_count = prediction_mask.sum()
+        rows.append(
+            {
+                "sample_id": identifier,
+                "iou": float(intersection / union) if union else 1.0,
+                "dice": (
+                    float(2 * intersection / (target_count + prediction_count))
+                    if target_count + prediction_count
+                    else 1.0
+                ),
+                "false_positive_pixels": int(np.logical_and(~target_mask, prediction_mask).sum()),
+                "false_negative_pixels": int(np.logical_and(target_mask, ~prediction_mask).sum()),
+                "absolute_pixel_error": int(np.not_equal(target_mask, prediction_mask).sum()),
+            }
+        )
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(output, index=False)
+    return output
+
+
+def fit_and_track(
+    model: Any,
+    train_data: Any,
+    train_labels: Any,
+    *,
+    config: Any,
+    run_name: str,
+    validation_data: Any = None,
+    callbacks: Iterable[Any] = (),
+    checkpoint_path: str | Path | None = None,
+    error_analysis: tuple[np.ndarray, np.ndarray, Iterable[Any], str | Path] | None = None,
+    enable_autolog: bool = True,
+    **fit_kwargs: Any,
+) -> Any:
+    """Train one model and log config, history, checkpoint, and error analysis."""
+    with tracked_run(run_name=run_name, params={"tracking.schema_version": 1}):
+        log_config(config)
+        if enable_autolog:
+            enable_keras_autolog()
+        fit_args = dict(fit_kwargs)
+        if validation_data is not None:
+            fit_args["validation_data"] = validation_data
+        history = model.fit(train_data, train_labels, callbacks=list(callbacks), **fit_args)
+
+        for metric, values in getattr(history, "history", {}).items():
+            if values:
+                log_metrics({f"final.{metric}": values[-1]})
+        if checkpoint_path is not None and Path(checkpoint_path).is_file():
+            log_artifact(checkpoint_path, artifact_path="checkpoints")
+        if error_analysis is not None:
+            analysis_path = write_error_analysis(*error_analysis)
+            log_artifact(analysis_path, artifact_path="error_analysis")
+        return history
+
+
 __all__ = [
     "DEFAULT_EXPERIMENT",
     "DEFAULT_TRACKING_URI",
@@ -119,6 +201,8 @@ __all__ = [
     "log_artifact",
     "log_config",
     "log_metrics",
+    "fit_and_track",
     "start_run",
     "tracked_run",
+    "write_error_analysis",
 ]

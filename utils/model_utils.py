@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 
 from .tf_env import silence_tf
 
@@ -164,7 +165,7 @@ class StructuredTrainingLogger(Callback):
             self.best_val_loss = vloss
             note = "saved"
         logger.info(
-            "%4d/%-4d | %8.4f | %8.4f | %6.4f | %6.4f | %6.4f | %6.4f | %9.2e | %s",
+            "Ep %4d/%-4d | %8.4f | %8.4f | %6.4f | %6.4f | %6.4f | %6.4f | %9.2e | %s",
             epoch + 1,
             self.total_epochs,
             logs.get("loss", 0),
@@ -263,8 +264,9 @@ def seed_everything(seed: int = 42) -> None:
     TensorFlow global RNG (used for weight initialisation and dropout), which
     together guarantee byte-identical runs for a fixed seed.
     """
+    random.seed(seed)
     seed_numpy(seed)
-    tf.random.set_seed(seed)
+    tf.keras.utils.set_random_seed(seed)
 
 
 def configure_gpu() -> None:

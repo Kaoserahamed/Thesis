@@ -60,3 +60,30 @@ def test_log_execution_reraises_original_exception():
         raise AssertionError("log_execution must re-raise the original exception")
 
     assert "test.operation" in stream.getvalue()
+
+
+def test_error_tracker_posts_to_configured_webhook(monkeypatch):
+    from utils.error_tracking import ErrorTracker, TrackerConfig
+
+    requests = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return Response()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    tracker = ErrorTracker(TrackerConfig(webhook_url="https://monitor.example/errors"))
+    tracker.record(ValueError("webhook smoke"), tags={"event": "test"})
+
+    assert len(requests) == 1
+    request, timeout = requests[0]
+    assert request.full_url == "https://monitor.example/errors"
+    assert request.get_header("Content-type") == "application/json"
+    assert timeout == 2.0

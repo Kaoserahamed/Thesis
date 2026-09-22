@@ -52,6 +52,8 @@ from .data_utils import (  # noqa: F401
     load_temporal_sequence,
     normalize_array,
     save_geotiff,
+    validate_path,
+    validate_safe_pattern,
 )
 from .metrics_numpy import BINARY_THRESHOLD  # noqa: F401
 
@@ -169,15 +171,10 @@ def build_catalog(data_dir: str, pattern: str = "*.tif") -> pd.DataFrame:
     contains nothing usable -- so callers can rely on ``df["year"]`` without a
     guard clause.
     """
-    if not isinstance(data_dir, (str, os.PathLike)) or not str(data_dir).strip():
-        raise TypeError("data_dir must be a non-empty path")
-    if not isinstance(pattern, str) or not pattern.strip():
-        raise ValueError("pattern must be a non-empty string")
-    pattern_path = os.path.normpath(pattern)
-    if os.path.isabs(pattern) or pattern_path == ".." or pattern_path.startswith(".." + os.sep):
-        raise ValueError("pattern must be a relative local filename pattern")
+    data_dir = validate_path(data_dir, "data_dir")
+    pattern = validate_safe_pattern(pattern)
 
-    files = sorted(glob.glob(os.path.join(data_dir, pattern)))
+    files = sorted(glob.glob(os.path.join(str(data_dir), pattern)))
     records = []
     for filepath in files:
         match = re.search(r"(\d{4})", os.path.basename(filepath))

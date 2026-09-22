@@ -12,6 +12,7 @@ Environment
 -----------
 ``THESIS_ERROR_SINK`` – path to a JSONL file for recorded errors.
 ``THESIS_ERROR_MAX_BUFFER`` – ring-buffer size (default 1000).
+``THESIS_ERROR_WEBHOOK_URL`` – optional HTTPS endpoint receiving JSON errors.
 """
 
 from __future__ import annotations
@@ -23,6 +24,8 @@ import os
 import threading
 import time
 import traceback
+import urllib.error
+import urllib.request
 import uuid
 from collections import Counter, deque
 from dataclasses import dataclass, field
@@ -35,7 +38,9 @@ LOGGER = logging.getLogger("utils.error_tracking")
 
 _ENV_SINK = "THESIS_ERROR_SINK"
 _ENV_MAX_BUFFER = "THESIS_ERROR_MAX_BUFFER"
+_ENV_WEBHOOK = "THESIS_ERROR_WEBHOOK_URL"
 _DEFAULT_BUFFER = 1000
+_WEBHOOK_TIMEOUT_SECONDS = 2.0
 
 
 @dataclass
@@ -57,6 +62,7 @@ class TrackerConfig:
     """Mutable configuration for the singleton tracker."""
 
     sink: Optional[Path] = None
+    webhook_url: Optional[str] = None
     max_buffer: int = _DEFAULT_BUFFER
     enabled: bool = True
 
@@ -139,6 +145,7 @@ class ErrorTracker:
             self._buffer.append(record)
             self._signatures[record.signature] += 1
             self._write_jsonl(record)
+            self._send_webhook(record)
         LOGGER.warning(
             "error tracked: %s",
             record.signature,
@@ -191,6 +198,23 @@ class ErrorTracker:
         self._sink_handle.write(json.dumps(_record_to_dict(record), default=str) + "\n")
         self._sink_handle.flush()
 
+    def _send_webhook(self, record: ErrorRecord) -> None:
+        """Best-effort delivery to an external JSON webhook."""
+        if not self.config.webhook_url:
+            return
+        payload = json.dumps(_record_to_dict(record), default=str).encode("utf-8")
+        request = urllib.request.Request(
+            self.config.webhook_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=_WEBHOOK_TIMEOUT_SECONDS):
+                pass
+        except (OSError, urllib.error.URLError) as exc:
+            LOGGER.warning("external error webhook failed: %s", exc)
+
     def snapshot(self, limit: int = 100) -> Dict[str, Any]:
         """Return bounded tracker state suitable for a status endpoint."""
         with self._lock:
@@ -216,7 +240,11 @@ def get_tracker() -> ErrorTracker:
                 sink = os.environ.get(_ENV_SINK)
                 max_buffer = int(os.environ.get(_ENV_MAX_BUFFER, str(_DEFAULT_BUFFER)))
                 _TRACKER = ErrorTracker(
-                    TrackerConfig(sink=Path(sink) if sink else None, max_buffer=max_buffer)
+                    TrackerConfig(
+                        sink=Path(sink) if sink else None,
+                        webhook_url=os.environ.get(_ENV_WEBHOOK),
+                        max_buffer=max_buffer,
+                    )
                 )
     return _TRACKER
 

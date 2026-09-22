@@ -11,9 +11,14 @@ import tensorflow as tf
 
 from utils.experiment_tracking import fit_and_track
 from utils.model_utils import build_model, create_callbacks, seed_everything
-from utils.pipeline_utils import EXPERIMENT_PRESETS, create_sequences, load_image_stack, prepare_split
+from utils.pipeline_utils import (
+    EXPERIMENT_PRESETS,
+    create_sequences,
+    load_image_stack,
+    prepare_split,
+)
 
-RESOLUTIONS = tuple(sorted({config.resolution for config in EXPERIMENT_PRESETS.values()}))
+RESOLUTIONS = tuple(sorted({c.resolution for c in EXPERIMENT_PRESETS.values()}))
 ARCHITECTURES = ("convlstm", "unet_lstm", "attention_unet_convlstm", "swin_st", "vit_st")
 DATA_ENV = {resolution: f"{resolution.upper()}_DIR" for resolution in RESOLUTIONS}
 SEQUENCE_LENGTHS = {
@@ -26,7 +31,9 @@ SEQUENCE_LENGTHS = {
 }
 CUTOFF_YEARS = {
     resolution: next(
-        config.cutoff_year for config in EXPERIMENT_PRESETS.values() if config.resolution == resolution
+        config.cutoff_year
+        for config in EXPERIMENT_PRESETS.values()
+        if config.resolution == resolution
     )
     for resolution in RESOLUTIONS
 }
@@ -51,7 +58,8 @@ def _synthetic_stack(seed: int = 42):
 
 
 def _load_stack(resolution: str, data_dir: Path | None, seed: int):
-    directory = data_dir or Path(os.environ.get(DATA_ENV[resolution], f"data/raw/{resolution}"))
+    env_default = f"data/raw/{resolution}"
+    directory = data_dir or Path(os.environ.get(DATA_ENV[resolution], env_default))
     if directory.is_dir() and any(directory.glob("*.tif")):
         return load_image_stack(str(directory))
     return _synthetic_stack(seed)
@@ -67,8 +75,9 @@ def run(args: argparse.Namespace) -> Path:
     seq_len = SEQUENCE_LENGTHS[args.resolution]
     images, years = _load_stack(args.resolution, args.data_dir, args.seed)
     X_all, y_all, input_years, target_years = create_sequences(images, years, seq_len)
+    cutoff = CUTOFF_YEARS[args.resolution]
     X_tr, y_tr, X_val, y_val, X_test, y_test, test_years = prepare_split(
-        X_all, y_all, target_years, input_years, CUTOFF_YEARS[args.resolution]
+        X_all, y_all, target_years, input_years, cutoff
     )
 
     output_dir = args.output_dir / args.resolution
@@ -81,10 +90,16 @@ def run(args: argparse.Namespace) -> Path:
         model,
         X_tr,
         y_tr,
-        config={"resolution": args.resolution, "architecture": args.architecture, "seed": args.seed},
+        config={
+            "resolution": args.resolution,
+            "architecture": args.architecture,
+            "seed": args.seed,
+        },
         run_name=run_name,
         validation_data=(X_val, y_val),
-        callbacks=create_callbacks(run_name, checkpoint_dir=str(checkpoint_dir), epochs=args.epochs),
+        callbacks=create_callbacks(
+            run_name, checkpoint_dir=str(checkpoint_dir), epochs=args.epochs
+        ),
         checkpoint_path=checkpoint,
         epochs=args.epochs,
         batch_size=min(4, len(X_tr)),

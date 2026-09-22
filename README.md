@@ -215,6 +215,54 @@ ThesisFinal/
 pip install -r requirements.txt
 ```
 
+For a complete local development environment, install the CI and notebook
+dependencies instead:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+CI installs the committed [requirements.lock](requirements.lock) file for
+reproducible Python 3.11 builds. Refresh it after changing either dependency
+manifest with:
+
+```bash
+python -m pip install pip-tools
+pip-compile --output-file=requirements.lock requirements-dev.txt
+```
+
+Review lockfile changes as a normal dependency update. Dependabot checks
+Python manifests and GitHub Actions monthly through
+[.github/dependabot.yml](.github/dependabot.yml).
+
+### Container and VS Code setup
+
+The repository includes a CPU-oriented [Dockerfile](Dockerfile) and a
+[devcontainer](.devcontainer/devcontainer.json). The Docker image runs the
+local quality gates by default:
+
+```bash
+docker build -t river-morphology-thesis .
+docker run --rm river-morphology-thesis
+```
+
+To use JupyterLab from the image, override the default command and publish
+port 8888:
+
+```bash
+docker run --rm -p 8888:8888 river-morphology-thesis \
+  jupyter lab --ip=0.0.0.0 --no-browser
+```
+
+VS Code users can open the repository in the Dev Containers extension and
+choose **Reopen in Container**. The container installs `requirements-dev.txt`
+and configures the Python, pytest, linting, and Jupyter extensions.
+
+Copy [.env.example](.env.example) to `.env` when custom data directories are
+needed. `.env` is ignored by Git; never place Earth Engine credentials or
+service-account JSON in it. Authenticate Earth Engine separately with
+`earthengine authenticate` after installing `requirements-collection.txt`.
+
 ### 2. Authenticate Google Earth Engine (data collection only)
 
 ```bash

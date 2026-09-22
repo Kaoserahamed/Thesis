@@ -199,6 +199,7 @@ ThesisFinal/
 │
 ├── requirements.txt                 # Runtime dependencies
 ├── requirements-dev.txt             # Test/lint dependencies (used by CI)
+├── requirements.lock                # Exact transitive Python 3.11 CI lockfile
 ├── requirements-collection.txt      # Google Earth Engine (data collection only)
 ├── pyproject.toml                   # Packaging, black, pytest & coverage config
 ├── setup.cfg                        # flake8 + mypy config
@@ -212,7 +213,8 @@ ThesisFinal/
 ### 1. Install dependencies
 
 ```bash
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r requirements.lock
 ```
 
 For a complete local development environment, install the CI and notebook
@@ -231,9 +233,20 @@ python -m pip install pip-tools
 pip-compile --output-file=requirements.lock requirements-dev.txt
 ```
 
+The complete fresh-clone workflow is:
+
+```bash
+python -m pip install -r requirements.lock
+python -m build --outdir dist
+python scripts/verify_dist.py dist
+python -m pytest tests/ -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=50
+```
+
 Review lockfile changes as a normal dependency update. Dependabot checks
 Python manifests and GitHub Actions monthly through
 [.github/dependabot.yml](.github/dependabot.yml).
+The lockfile policy and CI freshness check are documented in
+[docs/dependency_management.md](docs/dependency_management.md).
 
 ### Container and VS Code setup
 
@@ -263,6 +276,12 @@ needed. `.env` is ignored by Git; never place Earth Engine credentials or
 service-account JSON in it. Authenticate Earth Engine separately with
 `earthengine authenticate` after installing `requirements-collection.txt`.
 
+The seven primary runtime variables are `YEARLY_DIR`, `QUARTERLY_DIR`,
+`BIMONTHLY_DIR`, `MLFLOW_EXPERIMENT_NAME`, `MLFLOW_TRACKING_URI`,
+`THESIS_DISK_FREE_GB`, and `THESIS_ERROR_WEBHOOK_URL`. The template includes
+safe local defaults; the webhook remains empty unless external monitoring is
+configured.
+
 ### 2. Authenticate Google Earth Engine (data collection only)
 
 ```bash
@@ -274,6 +293,29 @@ earthengine authenticate
 ```bash
 python scripts/generate_notebooks.py     # (re)write the self-contained notebooks
 python scripts/validate_notebooks.py     # sanity-check them (valid, parseable, self-contained)
+```
+
+## Reproduce results
+
+The following sequence regenerates the self-contained notebooks and executes
+one tracked model notebook end to end. It uses the committed Python 3.11 lockfile;
+set the relevant `YEARLY_DIR`, `QUARTERLY_DIR`, or `BIMONTHLY_DIR` before execution.
+
+```bash
+python -m pip install -r requirements.lock
+python scripts/generate_notebooks.py
+jupyter nbconvert --to notebook --execute \
+  models/yearly/03_yearly_attention_unet_convlstm.ipynb \
+  --output executed_yearly_attention_unet_convlstm.ipynb
+```
+
+Runs use deterministic NumPy/TensorFlow seeding and the experiment presets in
+`utils/pipeline_utils.py`. MLflow writes local run metadata and artifacts to
+`./mlruns` by default; set `MLFLOW_TRACKING_URI` to compare runs through a
+shared tracking server. The one-epoch, data-free wiring check is:
+
+```bash
+python scripts/smoke_train.py
 ```
 
 ### 4. Run the test suite (optional)
@@ -355,6 +397,22 @@ Set `MLFLOW_TRACKING_URI` and optionally `MLFLOW_EXPERIMENT_NAME` to send runs
 to a shared MLflow server. Tracking is opt-in; existing notebook workflows
 continue to run without a tracking account.
 
+For a single reproducible, tracked run using a preset:
+
+```bash
+python scripts/run_experiment.py \
+  --preset yearly_setup1 \
+  --model attention_unet_convlstm \
+  --seq-len 4 \
+  --seed 42
+```
+
+The command loads the configured GeoTIFF sequence, applies the preset temporal
+split, trains with deterministic seeding, logs the run and checkpoint to
+MLflow, and writes `metrics.csv` plus `error_analysis.csv` under
+`outputs/runs/`. Set `MLFLOW_TRACKING_URI` to send the same run metadata to a
+shared tracking server.
+
 ---
 
 ## 📖 Usage
@@ -402,6 +460,10 @@ jupyter notebook results/01_statistical_analysis.ipynb
 The shared library is covered by 91 pytest tests, and every push runs
 **black + flake8 + mypy + notebook validation + package build + tests** on GitHub Actions
 (`.github/workflows/ci.yml`).
+
+Pushes to `main` deploy the static prediction map from `docs/` to GitHub Pages
+after linting, tests, and the package build pass. Pull requests run the same
+quality gates but do not deploy.
 
 ```bash
 pip install -r requirements-dev.txt

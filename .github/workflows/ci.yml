@@ -152,16 +152,35 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
       - name: Install pip-audit
         run: pip install pip-audit
 
       - name: Run pip-audit
         run: pip-audit -r requirements.txt || true
+
+  # ---------------------------------------------------------------------------
+  # 5. Deploy prediction map to GitHub Pages (serves from /docs folder).
+  # ---------------------------------------------------------------------------
+  pages:
+    name: Deploy prediction map
+    runs-on: ubuntu-latest
+    needs: [lint, build]
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node (for gh-pages)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/
+          destination_dir: .
+          exclude_assets: .gitkeep

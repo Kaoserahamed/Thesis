@@ -30,6 +30,15 @@ Five spatiotemporal architectures are compared — ConvLSTM, U-Net+LSTM, Attenti
 Swin Transformer and a ViT-based model — across **yearly, quarterly and bi-monthly** temporal
 resolutions under two strict temporal evaluation setups.
 
+## 🗺️ Interactive Prediction Map
+
+An interactive **long-term prediction map** (2026–2040) is deployed via GitHub Pages:
+➡️ **[https://kaoserahamed.github.io/Thesis](https://kaoserahamed.github.io/Thesis)**
+
+The map visualizes predicted water-mask evolution across all three temporal resolutions
+(yearly, quarterly, bi-monthly). Source: `docs/index.html` (auto-deployed from the `docs/`
+folder on every push to `main`).
+
 ---
 
 ## 🖼️ Visual Summary

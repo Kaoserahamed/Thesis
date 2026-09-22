@@ -171,7 +171,7 @@ def build_catalog(data_dir: str, pattern: str = "*.tif") -> pd.DataFrame:
     contains nothing usable -- so callers can rely on ``df["year"]`` without a
     guard clause.
     """
-    data_dir = validate_path(data_dir, "data_dir")
+    data_dir = str(validate_path(data_dir, "data_dir"))
     pattern = validate_safe_pattern(pattern)
 
     files = sorted(glob.glob(os.path.join(str(data_dir), pattern)))

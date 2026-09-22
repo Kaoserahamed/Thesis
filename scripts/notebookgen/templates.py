@@ -70,6 +70,28 @@ from sklearn.metrics import precision_score, recall_score
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import mlflow
+
+
+def fit_and_track(model, train_data, train_labels, *, config, run_name,
+                  validation_data=None, callbacks=(), checkpoint_path=None,
+                  enable_autolog=True, **fit_kwargs):
+    # Train one configuration and persist its MLflow run and checkpoint.
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "file:./mlruns"))
+    mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME", "river-morphology"))
+    with mlflow.start_run(run_name=run_name):
+        mlflow.log_params({f"config.{key}": str(value) for key, value in config.items()})
+        if enable_autolog:
+            mlflow.tensorflow.autolog(log_models=False, silent=True)
+        if validation_data is not None:
+            fit_kwargs["validation_data"] = validation_data
+        history = model.fit(train_data, train_labels, callbacks=list(callbacks), **fit_kwargs)
+        for metric, values in history.history.items():
+            if values:
+                mlflow.log_metric(f"final.{metric}", float(values[-1]))
+        if checkpoint_path and os.path.isfile(checkpoint_path):
+            mlflow.log_artifact(checkpoint_path, artifact_path="checkpoints")
+        return history
 
 # ---- Reproducibility -------------------------------------------------------
 np.random.seed(42)
@@ -155,12 +177,18 @@ for setup_name, cfg in SETUP_CONFIGS.items():
 
         tf.keras.backend.clear_session()
         model = %%BUILDER%%(seq_len)
-        hist = model.fit(
-            X_tr, y_tr,
+        hist = fit_and_track(
+            model,
+            X_tr,
+            y_tr,
+            config=cfg,
+            run_name=tag,
             validation_data=(X_val, y_val),
+            checkpoint_path=os.path.join(CKPT_DIR, f"{tag}_best.keras"),
             epochs=DEFAULT_EPOCHS,
             batch_size=BATCH_SIZE,
             callbacks=create_callbacks(tag, checkpoint_dir=CKPT_DIR),
+            enable_autolog=True,
             verbose=0,
         )
         histories[(setup_name, seq_len)] = hist

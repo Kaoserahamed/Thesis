@@ -3,29 +3,39 @@ cells, self-contained (no model_utils imports, no leftover %% tokens), and
 every called builder/helper is defined in the same notebook.
 """
 
+from __future__ import annotations
+
 import ast
 import json
-import glob
-import sys
 import re
+import sys
+from pathlib import Path
 
-NOTEBOOKS = sorted(
-    glob.glob("models/**/*.ipynb", recursive=True)
-    + glob.glob("analysis/*.ipynb")
-    + glob.glob("data_collection/*.ipynb")
-    + glob.glob("preprocessing/*.ipynb")
-    + glob.glob("results/*.ipynb")
-)
 
-# Notebooks we generate (self-contained) -- exclude hand-written legacy ones.
-GENERATED = [nb for nb in NOTEBOOKS if "01_gap_filling_comparison" not in nb]
+def collect_notebooks(root: str | Path = ".") -> tuple[list[str], list[str]]:
+    """Return ``(all_notebooks, generated_notebooks)`` under *root*."""
+    root = Path(root)
+    patterns = [
+        "models/**/*.ipynb",
+        "analysis/*.ipynb",
+        "data_collection/*.ipynb",
+        "preprocessing/*.ipynb",
+        "results/*.ipynb",
+    ]
+    notebooks = sorted(str(p) for pat in patterns for p in root.glob(pat) if p.is_file())
+    # Notebooks we generate (self-contained) -- exclude hand-written legacy ones.
+    generated = [nb for nb in notebooks if "01_gap_filling_comparison" not in nb]
+    return notebooks, generated
 
-errors = []
-for nb_path in GENERATED:
+
+def validate_notebook(nb_path: str | Path) -> list[str]:
+    """Validate one notebook file; return a list of error strings."""
+    errors: list[str] = []
     with open(nb_path, encoding="utf-8") as f:
         nb = json.load(f)
 
-    assert "cells" in nb and "nbformat" in nb, f"{nb_path}: not valid nbformat"
+    if "cells" not in nb or "nbformat" not in nb:
+        return [f"{nb_path}: not valid nbformat"]
 
     code_cells = [c for c in nb["cells"] if c["cell_type"] == "code"]
     all_code = "\n".join("".join(c["source"]) for c in code_cells)
@@ -80,11 +90,29 @@ for nb_path in GENERATED:
     }
     if interesting:
         errors.append(f"{nb_path}: undefined referenced helpers {sorted(interesting)}")
+    return errors
 
-print(f"Validated {len(GENERATED)} generated notebooks.")
-if errors:
-    print("\nISSUES:")
-    for e in errors:
-        print("  -", e)
-    sys.exit(1)
-print("All notebooks OK (valid JSON, parseable, self-contained).")
+
+def validate_all(root: str | Path = ".") -> tuple[int, list[str]]:
+    """Validate every generated notebook; return ``(count, errors)``."""
+    _, generated = collect_notebooks(root)
+    errors: list[str] = []
+    for nb_path in generated:
+        errors.extend(validate_notebook(nb_path))
+    return len(generated), errors
+
+
+def main() -> int:
+    count, errors = validate_all(".")
+    print(f"Validated {count} generated notebooks.")
+    if errors:
+        print("\nISSUES:")
+        for e in errors:
+            print("  -", e)
+        return 1
+    print("All notebooks OK (valid JSON, parseable, self-contained).")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -18,6 +18,7 @@ UTILS = ROOT / "utils"
 SOURCE_MODULES = (
     UTILS / "metrics_numpy.py",
     UTILS / "pipeline_utils.py",
+    UTILS / "forecast_utils.py",
     UTILS / "model_losses.py",
     UTILS / "model_architectures.py",
     UTILS / "model_utils.py",

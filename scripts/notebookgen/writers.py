@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .comparison import comparison_notebook
-from .extract import ROOT, code, md, write_notebook
+from .extract import ROOT, _banner, code, grab, md, write_notebook
 from .metadata import ARCHITECTURES, ARCH_ORDER, FORECASTS, RESOLUTIONS, arch_number, stem_for
 from .prediction import PRED_DATA, PRED_FORECAST, PRED_PRELUDE, PRED_VIZ
 from .templates import (
@@ -132,6 +132,14 @@ def _prediction_title(res_key: str) -> str:
     )
 
 
+def forecast_helpers_code() -> str:
+    """Inline the pure-NumPy forecast-cube helpers from ``utils/forecast_utils.py``."""
+    parts = [_banner("Forecast helpers  (utils/forecast_utils.py)")]
+    for fn in ["frames_to_cube", "make_forecast_sequences"]:
+        parts.append(grab(fn))
+    return "\n\n".join(parts)
+
+
 def final_prediction_notebook(res_key: str) -> None:
     """Write the best-model final-prediction notebook for one resolution."""
     res, fc = RESOLUTIONS[res_key], FORECASTS[res_key]
@@ -153,6 +161,7 @@ def final_prediction_notebook(res_key: str) -> None:
         ):
             t = t.replace(token, value)
         t = t.replace("%%CALLBACKS%%", callbacks_code())
+        t = t.replace("%%FORECAST_HELPERS%%", forecast_helpers_code())
         return t
 
     cells = [

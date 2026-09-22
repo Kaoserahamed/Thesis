@@ -88,33 +88,19 @@ PRED_FORECAST = '''# ===========================================================
 # Train the best model on the full record and roll the forecast forward
 # ============================================================================
 %%CALLBACKS%%
+%%FORECAST_HELPERS%%
 
 N_CHANNELS = 3 if SEASONAL_CHANNELS else 1
 
 
 def to_cube(frames):
-    """Stack frames into a (T, H, W, C) tensor, optionally adding sin/cos
-    channels that encode the position inside the annual cycle."""
-    stack = np.stack(frames, axis=0).astype(np.float32)
-    if not SEASONAL_CHANNELS:
-        return np.expand_dims(stack, -1)
-    T, H, W = stack.shape
-    cube = np.empty((T, H, W, 3), dtype=np.float32)
-    for t in range(T):
-        phase = 2.0 * np.pi * ((t % 6) / 6.0)
-        cube[t, ..., 0] = stack[t]
-        cube[t, ..., 1] = np.sin(phase)
-        cube[t, ..., 2] = np.cos(phase)
-    return cube
+    """Stack frames into a (T, H, W, C) tensor (see utils/forecast_utils.py)."""
+    return frames_to_cube(frames, seasonal=SEASONAL_CHANNELS)
 
 
 def make_sequences(cube, seq_len, horizon=1):
     """Sliding-window sequences (stride 1); the target is the next frame."""
-    X, y = [], []
-    for i in range(len(cube) - seq_len - horizon + 1):
-        X.append(cube[i:i + seq_len])
-        y.append(cube[i + seq_len + horizon - 1, ..., 0])
-    return np.array(X), np.expand_dims(np.array(y), -1)
+    return make_forecast_sequences(cube, seq_len, horizon=horizon)
 
 
 cube = to_cube(images)

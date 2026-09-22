@@ -1,4 +1,5 @@
 # Analyzing & Forecasting River Morphological Evolution Using Machine Learning & Spatiotemporal Neural Models
+
 ## A Case Study on the Padma River
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)]()
@@ -33,17 +34,33 @@ resolutions under two strict temporal evaluation setups.
 
 ## 🖼️ Visual Summary
 
+<div align="center">
+
 **Study Area Selection**
-<img width="500" height="500" alt="StudyArea" src="https://github.com/user-attachments/assets/f5c83b4b-2fa8-4373-8283-36be2e14b36e" />
+<br>
+<a href="https://github.com/user-attachments/assets/f5c83b4b-2fa8-4373-8283-36be2e14b36e">
+  <img src="https://github.com/user-attachments/assets/f5c83b4b-2fa8-4373-8283-36be2e14b36e" alt="StudyArea" width="500" height="auto" />
+</a>
 
 **Water Mask**
-<img width="500" height="500" alt="Screenshot 2026-06-25 120856" src="https://github.com/user-attachments/assets/8f2f1069-cb65-4e2d-8f65-342b39f09940" />
+<br>
+<a href="https://github.com/user-attachments/assets/8f2f1069-cb65-4e2d-8f65-342b39f09940">
+  <img src="https://github.com/user-attachments/assets/8f2f1069-cb65-4e2d-8f65-342b39f09940" alt="Water Mask" width="500" height="auto" />
+</a>
 
 **Analysis** (seasonal profiles & cross-validation)
-<img width="500" height="500" alt="fig2_seasonal_profiles_cv" src="https://github.com/user-attachments/assets/952322a9-c775-4bca-9bf6-b9d4d51b2c11" />
+<br>
+<a href="https://github.com/user-attachments/assets/952322a9-c775-4bca-9bf6-b9d4d51b2c11">
+  <img src="https://github.com/user-attachments/assets/952322a9-c775-4bca-9bf6-b9d4d51b2c11" alt="fig2_seasonal_profiles_cv" width="500" height="auto" />
+</a>
 
 **Prediction** (long-term morphological forecast 2026–2040)
-<img width="1911" height="911" alt="Screenshot 2026-04-27 120150" src="https://github.com/user-attachments/assets/da72745f-53894e56-9561-b1e26dc73a3f" />
+<br>
+<a href="https://github.com/user-attachments/assets/da72745f-53894e56-9561-b1e26dc73a3f">
+  <img src="https://github.com/user-attachments/assets/da72745f-53894e56-9561-b1e26dc73a3f" alt="Prediction" width="500" height="auto" />
+</a>
+
+</div>
 
 ---
 

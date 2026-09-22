@@ -47,21 +47,6 @@ resolutions under two strict temporal evaluation setups.
 
 ---
 
-This repository contains the complete implementation of a framework that **forecasts river
-morphological evolution** from freely available satellite imagery using spatiotemporal deep
-learning. The study covers a **38-year time series (1987–2025)** of binary water masks for the
-Padma River, Bangladesh, built from Landsat (5 TM, 7 ETM+, 8 OLI) and Sentinel (Sentinel-2 MSI,
-Sentinel-1 SAR) imagery via **Google Earth Engine**.
-
-Five spatiotemporal architectures are compared — ConvLSTM, U-Net+LSTM, Attention U-Net+ConvLSTM,
-Swin Transformer and a ViT-based model — across **yearly, quarterly and bi-monthly** temporal
-resolutions under two strict temporal evaluation setups.
-
-> 📄 The full study is documented in [`docs/predefence_report.md`](docs/predefence_report.md)
-> (a Markdown conversion of the pre-defence report) and `docs/Thesis_Paper.pdf`.
-
----
-
 ## 🎯 Key Results
 
 ### Gap-filling (reconstructing missing annual masks)

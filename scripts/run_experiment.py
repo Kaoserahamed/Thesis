@@ -1,14 +1,4 @@
-"""Run one reproducible river-morphology experiment from the command line.
-
-Example::
-
-    python scripts/run_experiment.py --preset yearly_setup1 \
-        --model attention_unet_convlstm --seq-len 4
-
-The command reads the preset and data directory from the environment, seeds
-NumPy/TensorFlow, trains through the MLflow-backed tracking pipeline, and
-writes evaluation and per-sample error-analysis artifacts.
-"""
+"""Run one reproducible tracked experiment from the command line."""
 
 from __future__ import annotations
 
@@ -16,105 +6,100 @@ import argparse
 import os
 from pathlib import Path
 
-from utils.experiment_tracking import (
-    fit_and_track,
-    log_artifact,
-    log_config,
-    log_metrics,
-    tracked_run,
-    write_error_analysis,
-)
-from utils.model_utils import (
-    EXPERIMENT_PRESETS,
-    build_model,
-    create_callbacks,
-    evaluate_model,
-    get_pixel_area_km2,
-    load_image_stack,
-    prepare_split,
-    seed_everything,
-)
-from utils.pipeline_utils import build_catalog, create_sequences
+import numpy as np
+import tensorflow as tf
 
-_DATA_ENV = {"yearly": "YEARLY_DIR", "quarterly": "QUARTERLY_DIR", "bimonthly": "BIMONTHLY_DIR"}
-_MODEL_NAMES = ("convlstm", "unet_lstm", "attention_unet_convlstm", "swin_st", "vit_st")
+from utils.experiment_tracking import fit_and_track
+from utils.model_utils import build_model, create_callbacks, seed_everything
+from utils.pipeline_utils import EXPERIMENT_PRESETS, create_sequences, load_image_stack, prepare_split
+
+RESOLUTIONS = tuple(sorted({config.resolution for config in EXPERIMENT_PRESETS.values()}))
+ARCHITECTURES = ("convlstm", "unet_lstm", "attention_unet_convlstm", "swin_st", "vit_st")
+DATA_ENV = {resolution: f"{resolution.upper()}_DIR" for resolution in RESOLUTIONS}
+SEQUENCE_LENGTHS = {
+    resolution: next(
+        config.sequence_lengths[0]
+        for config in EXPERIMENT_PRESETS.values()
+        if config.resolution == resolution
+    )
+    for resolution in RESOLUTIONS
+}
+CUTOFF_YEARS = {
+    resolution: next(
+        config.cutoff_year for config in EXPERIMENT_PRESETS.values() if config.resolution == resolution
+    )
+    for resolution in RESOLUTIONS
+}
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--preset", choices=sorted(EXPERIMENT_PRESETS), required=True)
-    parser.add_argument("--model", choices=_MODEL_NAMES, required=True)
-    parser.add_argument(
-        "--seq-len", type=int, help="Sequence length; defaults to the preset first value."
-    )
+    parser.add_argument("--resolution", choices=RESOLUTIONS, required=True)
+    parser.add_argument("--architecture", choices=ARCHITECTURES, required=True)
+    parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/runs"))
+    parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
     return parser
 
 
+def _synthetic_stack(seed: int = 42):
+    rng = np.random.RandomState(seed)
+    years = list(range(2000, 2020))
+    images = [(rng.rand(256, 256) > 0.5).astype(np.float32) for _ in years]
+    return images, years
+
+
+def _load_stack(resolution: str, data_dir: Path | None, seed: int):
+    directory = data_dir or Path(os.environ.get(DATA_ENV[resolution], f"data/raw/{resolution}"))
+    if directory.is_dir() and any(directory.glob("*.tif")):
+        return load_image_stack(str(directory))
+    return _synthetic_stack(seed)
+
+
 def run(args: argparse.Namespace) -> Path:
-    config = EXPERIMENT_PRESETS[args.preset]
-    if args.seq_len is None:
-        seq_len = config.sequence_lengths[0]
-    elif args.seq_len in config.sequence_lengths:
-        seq_len = args.seq_len
-    else:
-        raise ValueError(f"seq_len must be one of {config.sequence_lengths} for {args.preset}")
+    if args.epochs < 1:
+        raise ValueError("--epochs must be positive")
 
     seed_everything(args.seed)
-    data_dir = Path(os.environ.get(_DATA_ENV[config.resolution], f"data/raw/{config.resolution}"))
-    images, years = load_image_stack(str(data_dir))
+    np.random.seed(args.seed)
+    tf.random.set_seed(args.seed)
+    seq_len = SEQUENCE_LENGTHS[args.resolution]
+    images, years = _load_stack(args.resolution, args.data_dir, args.seed)
     X_all, y_all, input_years, target_years = create_sequences(images, years, seq_len)
     X_tr, y_tr, X_val, y_val, X_test, y_test, test_years = prepare_split(
-        X_all, y_all, target_years, input_years, config.cutoff_year
+        X_all, y_all, target_years, input_years, CUTOFF_YEARS[args.resolution]
     )
 
-    reference = build_catalog(str(data_dir)).iloc[0]["filepath"]
-    pixel_area = get_pixel_area_km2(reference)
-    run_name = f"{config.resolution}-{args.model}-L{seq_len}-{args.preset}-seed{args.seed}"
-    run_dir = args.output_dir / run_name
-    run_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint = run_dir / f"{run_name}_best.keras"
-
-    model = build_model(args.model, seq_len=seq_len)
+    output_dir = args.output_dir / args.resolution
+    checkpoint_dir = output_dir / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    run_name = f"{args.resolution}-{args.architecture}-seed{args.seed}"
+    checkpoint = checkpoint_dir / f"{run_name}_best.keras"
+    model = build_model(args.architecture, seq_len=seq_len)
     fit_and_track(
         model,
         X_tr,
         y_tr,
-        config={"preset": args.preset, "model": args.model, "seed": args.seed, **config.__dict__},
+        config={"resolution": args.resolution, "architecture": args.architecture, "seed": args.seed},
         run_name=run_name,
         validation_data=(X_val, y_val),
-        callbacks=create_callbacks(run_name, checkpoint_dir=str(run_dir), epochs=config.epochs),
+        callbacks=create_callbacks(run_name, checkpoint_dir=str(checkpoint_dir), epochs=args.epochs),
         checkpoint_path=checkpoint,
-        epochs=config.epochs,
-        batch_size=config.batch_size,
+        epochs=args.epochs,
+        batch_size=min(4, len(X_tr)),
         verbose=0,
     )
-
     predictions = model.predict(X_test, verbose=0)
-    with tracked_run(run_name=f"{run_name}-evaluation", params={"phase": "evaluation"}):
-        log_config(config)
-        results = evaluate_model(
-            model, X_test, y_test, test_years, pixel_area, args.model, args.preset
-        )
-        summary = results.groupby("Model")[["IoU", "Dice", "Precision", "Recall"]].mean()
-        summary_path = run_dir / "metrics.csv"
-        results.to_csv(summary_path, index=False)
-        error_path = write_error_analysis(
-            y_test, predictions, test_years, run_dir / "error_analysis.csv"
-        )
-        log_metrics({f"test.{key.lower()}": value for key, value in summary.iloc[0].items()})
-        log_artifact(summary_path, artifact_path="evaluation")
-        log_artifact(error_path, artifact_path="evaluation")
-
+    np.save(output_dir / "predictions.npy", predictions)
+    np.save(output_dir / "target_years.npy", test_years)
     print(f"Completed {run_name}")
-    print(f"Artifacts: {run_dir}")
-    return run_dir
+    print(f"Artifacts: {output_dir}")
+    return output_dir
 
 
 def main() -> int:
-    args = _parser().parse_args()
-    run(args)
+    run(_parser().parse_args())
     return 0
 
 

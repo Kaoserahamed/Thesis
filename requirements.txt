@@ -42,4 +42,4 @@ tqdm>=4.64
 # ---- Experiment tracking --------------------------------------------------
 # Local file-backed tracking works without an account; set MLFLOW_TRACKING_URI
 # when using a shared MLflow server.
-mlflow>=2.16,<3.0
+mlflow>=2.16,<4.0

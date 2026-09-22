@@ -318,6 +318,16 @@ shared tracking server. The one-epoch, data-free wiring check is:
 python scripts/smoke_train.py
 ```
 
+Run a reproducible tracked experiment from the shared entry point:
+
+```bash
+python scripts/run_experiment.py --resolution yearly --architecture convlstm --epochs 1
+```
+
+The command writes checkpoints and prediction artifacts under
+`outputs/<resolution>/` and falls back to a deterministic synthetic data set
+when the selected resolution directory is not available.
+
 ### 4. Run the test suite (optional)
 
 ```bash

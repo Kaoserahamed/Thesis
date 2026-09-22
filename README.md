@@ -18,6 +18,16 @@
 
 ---
 
+## Contents
+
+- [Overview](#-overview)
+- [Key Results](#-key-results)
+- [Repository Structure](#-repository-structure)
+- [Getting Started](#-getting-started)
+- [Reproduce Results](#reproduce-results)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+
 ## 🌊 Overview
 
 This repository contains the complete implementation of a framework that **forecasts river

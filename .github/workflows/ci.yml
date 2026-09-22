@@ -47,6 +47,11 @@ jobs:
       - name: Validate generated notebooks
         run: python scripts/validate_notebooks.py
 
+      # pip-audit has no severity filter: it exits non-zero on ANY finding, so
+      # high-severity findings fail this job (and gate test/build/deploy).
+      - name: Audit locked dependencies (pip-audit)
+        run: pip install pip-audit && pip-audit -r requirements.lock
+
   # ---------------------------------------------------------------------------
   # 2. Tests -- split into a fast unit lane and a TensorFlow/model lane.
   # ---------------------------------------------------------------------------
@@ -164,11 +169,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - name: Install pip-audit
-        run: pip install pip-audit
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Run pip-audit
-        run: pip-audit -r requirements.txt || true
+        run: pip install pip-audit && pip-audit -r requirements.lock
 
   # ---------------------------------------------------------------------------
   # 5. Deploy prediction map to GitHub Pages after the main-branch CI gates.

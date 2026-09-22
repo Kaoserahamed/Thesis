@@ -8,7 +8,13 @@ import pytest
 
 from utils.data_utils import compute_statistics, split_temporal_data, normalize_array
 from utils.data_utils import create_water_mask, extract_year_from_filename
-from utils.data_utils import calculate_water_area, load_config, load_geotiff, load_temporal_sequence, save_geotiff
+from utils.data_utils import (
+    calculate_water_area,
+    load_config,
+    load_geotiff,
+    load_temporal_sequence,
+    save_geotiff,
+)
 
 
 class TestComputeStatistics:

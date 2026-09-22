@@ -10,6 +10,8 @@ rasterio and read back, so the fast CI lane exercises the real I/O code paths.
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -262,6 +264,17 @@ class TestSequenceInputValidation:
 
 
 class TestConfigureLogging:
+    def test_importing_utils_does_not_eagerly_load_tensorflow(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sys; import utils; raise SystemExit(int('tensorflow' in sys.modules))",
+            ],
+            check=False,
+        )
+        assert result.returncode == 0
+
     def test_installs_single_stream_handler(self):
         from utils import configure_logging
 

@@ -51,6 +51,7 @@ def main() -> int:
         ("flake8", [*flake8_cmd, "utils", "tests", "scripts"]),
         ("mypy", [*mypy_cmd, "utils", "tests", "scripts"]),
         ("validate notebooks", [PY, "scripts/validate_notebooks.py"]),
+        ("health self-probe", [PY, "scripts/serve_health.py", "--once"]),
     ]
 
     if args.build:
@@ -60,7 +61,18 @@ def main() -> int:
         ]
 
     # `slow` marks model construction; the workflow's fast lane deselects it.
-    checks.append(("pytest (fast lane)", [*pytest_cmd, "-m", "not slow"]))
+    fast_args = [*pytest_cmd, "-m", "not slow"]
+    if not args.all:
+        fast_args.extend(
+            [
+                "--ignore",
+                "tests/test_model_builders.py",
+                "--cov=utils",
+                "--cov-report=term-missing",
+                "--cov-fail-under=50",
+            ]
+        )
+    checks.append(("pytest (fast lane)", fast_args))
     if args.all:
         checks.append(("pytest (model lane)", [*pytest_cmd, "-m", "requires_tensorflow"]))
 

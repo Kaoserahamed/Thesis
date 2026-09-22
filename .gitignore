@@ -47,6 +47,7 @@ data/processed/
 data/predictions/
 outputs/
 checkpoints/
+mlruns/
 *.tif
 *.tiff
 *.zip

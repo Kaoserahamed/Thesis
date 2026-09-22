@@ -58,7 +58,7 @@ jobs:
       matrix:
         include:
           - name: fast
-            pytest_args: "-m 'not slow'"
+            pytest_args: "-m 'not slow' --ignore=tests/test_model_builders.py --cov-fail-under=50"
           - name: models
             pytest_args: "-m 'requires_tensorflow'"
     steps:

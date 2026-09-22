@@ -38,3 +38,8 @@ folium>=0.14,<1.0
 # ---- Configuration & helpers ----------------------------------------------
 PyYAML>=6.0,<7.0
 tqdm>=4.64
+
+# ---- Experiment tracking --------------------------------------------------
+# Local file-backed tracking works without an account; set MLFLOW_TRACKING_URI
+# when using a shared MLflow server.
+mlflow>=2.16,<3.0

@@ -280,7 +280,7 @@ python scripts/validate_notebooks.py     # sanity-check them (valid, parseable, 
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -m "not slow"                     # fast lane, no TensorFlow
+pytest -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=50  # fast lane + coverage floor
 pytest -m "requires_tensorflow"          # builds all five architectures
 ```
 
@@ -333,6 +333,28 @@ notebook by `scripts/generate_notebooks.py`, so every model notebook runs on its
 
 IoU, Dice, Precision, Recall and the signed area difference `ΔA = A_pred − A_true` (km²).
 
+### Experiment tracking
+
+Experiments can be recorded locally with MLflow. The default backend writes
+run metadata and artifacts to `./mlruns`, which is ignored by Git. A run can
+capture an `ExperimentConfig`, Keras training history, evaluation metrics, and
+result files without requiring a hosted tracking service:
+
+```python
+from utils.pipeline_utils import EXPERIMENT_PRESETS
+from utils.experiment_tracking import enable_keras_autolog, log_config, log_metrics, tracked_run
+
+with tracked_run(run_name="yearly-attention-setup1"):
+  enable_keras_autolog()
+  log_config(EXPERIMENT_PRESETS["yearly_setup1"])
+  model.fit(X_train, y_train, validation_data=(X_val, y_val), callbacks=callbacks)
+  log_metrics({"test_iou": test_iou, "test_dice": test_dice})
+```
+
+Set `MLFLOW_TRACKING_URI` and optionally `MLFLOW_EXPERIMENT_NAME` to send runs
+to a shared MLflow server. Tracking is opt-in; existing notebook workflows
+continue to run without a tracking account.
+
 ---
 
 ## 📖 Usage
@@ -384,7 +406,7 @@ The shared library is covered by 91 pytest tests, and every push runs
 ```bash
 pip install -r requirements-dev.txt
 
-pytest -m "not slow"                     # fast unit lane (no TensorFlow)
+pytest -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=50  # fast lane + coverage floor
 pytest -m "requires_tensorflow"          # builds all five architectures
 pytest --cov=utils --cov-report=term-missing
 

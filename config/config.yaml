@@ -1,0 +1,371 @@
+# ============================================================
+# River Morphology Prediction - Configuration File
+# ============================================================
+
+# ============================================================
+# Project Metadata
+# ============================================================
+project:
+  name: "River Morphology Prediction"
+  version: "1.0.0"
+  description: "Deep learning-based river water body prediction using satellite imagery"
+  author: "Your Name"
+  institution: "Your University"
+  contact: "your.email@university.edu"
+
+# ============================================================
+# Study Area Configuration
+# ============================================================
+study_area:
+  name: "Padma River"
+  country: "Bangladesh"
+  description: "Major distributary of the Ganges River"
+  
+  # Polygon coordinates (longitude, latitude)
+  coordinates:
+    - [88.75677098777692, 24.00347653384235]
+    - [90.59972753074567, 23.152644569433964]
+    - [90.52556981590192, 23.54602121781216]
+    - [88.74480244337559, 24.334092333430064]
+    - [88.75677098777692, 24.00347653384235]
+  
+  # Center point for visualization
+  center:
+    latitude: 23.743
+    longitude: 89.67
+    zoom: 9
+
+# ============================================================
+# Data Collection Parameters
+# ============================================================
+data_collection:
+  # Time range
+  start_year: 1988
+  end_year: 2025
+  
+  # Temporal resolutions
+  temporal_scales:
+    - yearly
+    - quarterly
+    - bimonthly
+  
+  # Sentinel-2 parameters
+  sentinel2:
+    collection: "COPERNICUS/S2_SR_HARMONIZED"
+    cloud_cover_max: 50  # percent
+    bands:
+      green: "B3"
+      swir1: "B11"
+  
+  # Sentinel-1 parameters
+  sentinel1:
+    collection: "COPERNICUS/S1_GRD"
+    instrument_mode: "IW"
+    polarizations: ["VV", "VH"]
+    orbit_pass: "DESCENDING"
+  
+  # Landsat parameters
+  landsat:
+    collections:
+      - "LANDSAT/LT05/C02/T1_L2"  # Landsat 5
+      - "LANDSAT/LE07/C02/T1_L2"  # Landsat 7
+      - "LANDSAT/LC08/C02/T1_L2"  # Landsat 8
+    cloud_cover_max: 50
+    bands:
+      green: "SR_B2"  # Landsat 5/7
+      swir1: "SR_B5"  # Landsat 5/7
+  
+  # Export parameters
+  export:
+    scale: 60  # meters
+    crs: "EPSG:4326"
+    file_format: "GeoTIFF"
+    max_images_s2: 25
+    max_images_s1: 20
+
+# ============================================================
+# Water Detection Parameters
+# ============================================================
+water_detection:
+  # MNDWI (Modified Normalized Difference Water Index)
+  mndwi:
+    threshold: 0.0
+    formula: "(Green - SWIR1) / (Green + SWIR1)"
+  
+  # SAR threshold for Sentinel-1
+  sar:
+    vv_threshold: -16.0  # dB
+    method: "VV"
+
+# ============================================================
+# Preprocessing Configuration
+# ============================================================
+preprocessing:
+  # Gap filling
+  gap_filling:
+    enabled: true
+    method: "biconvlstm"  # Options: mean, median, linear, spline, sdf, weighted, biconvlstm
+    neighbor_count: 3
+    
+  # Cloud masking
+  cloud_masking:
+    enabled: true
+    landsat_qa_bits:
+      cloud_shadow: 3
+      cloud: 4
+    sentinel2_qa_bits:
+      opaque_clouds: 10
+      cirrus_clouds: 11
+  
+  # Normalization
+  normalization:
+    method: "minmax"  # Options: minmax, zscore, none
+    scale_range: [0, 1]
+  
+  # Data augmentation
+  augmentation:
+    enabled: true
+    horizontal_flip: true
+    vertical_flip: true
+    rotation_angles: [90, 180, 270]
+    random_crop: false
+
+# ============================================================
+# Model Configuration
+# ============================================================
+models:
+  # ConvLSTM Model
+  convlstm:
+    architecture:
+      input_channels: 1
+      hidden_channels: [64, 128, 64]
+      kernel_size: 3
+      num_layers: 3
+      bidirectional: true
+      return_sequences: true
+    
+    training:
+      batch_size: 4
+      epochs: 100
+      learning_rate: 0.001
+      optimizer: "adam"
+      loss_function: "bce"  # Binary Cross-Entropy
+      early_stopping:
+        enabled: true
+        patience: 10
+        monitor: "val_iou"
+        mode: "max"
+    
+    device: "cuda"  # Options: cuda, cpu, mps
+  
+  # Swin Transformer Model
+  swin_transformer:
+    architecture:
+      patch_size: 4
+      embed_dim: 96
+      depths: [2, 2, 6, 2]
+      num_heads: [3, 6, 12, 24]
+      window_size: 7
+      mlp_ratio: 4.0
+      qkv_bias: true
+      drop_rate: 0.0
+      attn_drop_rate: 0.0
+      drop_path_rate: 0.1
+    
+    training:
+      batch_size: 2  # Smaller due to memory constraints
+      epochs: 100
+      learning_rate: 0.0001
+      optimizer: "adamw"
+      loss_function: "bce"
+      weight_decay: 0.01
+      early_stopping:
+        enabled: true
+        patience: 15
+        monitor: "val_iou"
+        mode: "max"
+    
+    device: "cuda"
+
+# ============================================================
+# Training Configuration
+# ============================================================
+training:
+  # Data split
+  split_ratios:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  
+  # Random seed for reproducibility
+  random_seed: 42
+  
+  # Checkpointing
+  checkpointing:
+    enabled: true
+    save_best_only: true
+    save_frequency: 5  # epochs
+    checkpoint_dir: "./checkpoints"
+  
+  # Logging
+  logging:
+    enabled: true
+    log_frequency: 10  # batches
+    tensorboard: false
+    wandb: false
+
+# ============================================================
+# Evaluation Metrics
+# ============================================================
+evaluation:
+  metrics:
+    pixel_level:
+      - iou
+      - dice
+      - precision
+      - recall
+      - f1_score
+    
+    area_based:
+      - mae  # Mean Absolute Error
+      - rmse  # Root Mean Squared Error
+      - mape  # Mean Absolute Percentage Error
+    
+    morphological:
+      - centerline_shift
+      - width_deviation
+  
+  # Thresholds
+  binary_threshold: 0.5
+  
+  # Visualization
+  save_predictions: true
+  save_frequency: 10  # images
+
+# ============================================================
+# Paths Configuration
+# ============================================================
+paths:
+  # Data directories
+  data:
+    root: "./data"
+    raw: "./data/raw"
+    processed: "./data/processed"
+    predictions: "./data/predictions"
+    
+    # Temporal scales
+    yearly: "./data/raw/yearly"
+    quarterly: "./data/raw/quarterly"
+    bimonthly: "./data/raw/bimonthly"
+  
+  # Model directories
+  models:
+    root: "./models"
+    checkpoints: "./models/checkpoints"
+    trained: "./models/trained"
+  
+  # Output directories
+  outputs:
+    root: "./outputs"
+    figures: "./outputs/figures"
+    results: "./outputs/results"
+    logs: "./outputs/logs"
+  
+  # Documentation
+  docs: "./docs"
+
+# ============================================================
+# Visualization Configuration
+# ============================================================
+visualization:
+  # Figure settings
+  figure:
+    dpi: 150
+    format: "png"  # Options: png, jpg, pdf, svg
+    style: "seaborn-v0_8-darkgrid"
+  
+  # Color maps
+  colormaps:
+    water: "Blues"
+    change: "RdYlBu"
+    prediction: "viridis"
+  
+  # Interactive maps
+  maps:
+    tiles: "OpenStreetMap"  # Options: OpenStreetMap, CartoDB
+    overlay_opacity: 0.7
+
+# ============================================================
+# Statistical Analysis Configuration
+# ============================================================
+statistics:
+  # Trend analysis
+  trend:
+    method: "mann_kendall"
+    significance_level: 0.05
+  
+  # Seasonal decomposition
+  seasonal:
+    model: "additive"  # Options: additive, multiplicative
+    period: 4  # For quarterly data
+  
+  # Correlation
+  correlation:
+    method: "pearson"  # Options: pearson, spearman, kendall
+
+# ============================================================
+# Computational Resources
+# ============================================================
+resources:
+  # Multi-processing
+  num_workers: 4
+  pin_memory: true
+  
+  # Memory management
+  cache_size_gb: 10
+  cleanup_temp: true
+  
+  # GPU settings
+  gpu:
+    use_amp: true  # Automatic Mixed Precision
+    device_ids: [0]  # For multi-GPU
+
+# ============================================================
+# Experiment Tracking
+# ============================================================
+experiments:
+  # Experiment name
+  name: "river_morphology_v1"
+  
+  # Tags
+  tags:
+    - "padma_river"
+    - "deep_learning"
+    - "water_detection"
+  
+  # Notes
+  notes: "Baseline experiments with ConvLSTM and Swin Transformer"
+
+# ============================================================
+# Reproducibility
+# ============================================================
+reproducibility:
+  # Random seeds
+  python_seed: 42
+  numpy_seed: 42
+  torch_seed: 42
+  
+  # Deterministic operations
+  deterministic: true
+  benchmark: false  # Set true for faster training if input sizes are constant
+
+# ============================================================
+# Notifications (Optional)
+# ============================================================
+notifications:
+  enabled: false
+  email:
+    enabled: false
+    recipient: "your.email@university.edu"
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587

@@ -24,6 +24,7 @@ EXPECTED_MODULES = {
     "utils/visualization_utils.py",
     "utils/logging_framework.py",
     "utils/error_tracking.py",
+    "utils/experiment_tracking.py",
     "utils/health.py",
 }
 

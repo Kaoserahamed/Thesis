@@ -147,6 +147,16 @@ GeoTIFF I/O (`load_geotiff`, `save_geotiff`), temporal loading, normalisation, w
 
 ## 5. Configuration & conventions
 
+### Experiment tracking
+
+All contributors use the same local MLflow convention unless a shared server
+is explicitly configured: `MLFLOW_TRACKING_URI=file:./mlruns`. The experiment
+name defaults to `river-morphology` and can be overridden with
+`MLFLOW_EXPERIMENT_NAME`. The `mlruns/` directory is local output and is
+ignored by Git; commit source, configuration, and result summaries rather than
+the tracking database itself. This keeps runs comparable while avoiding
+credentials or machine-specific paths in the repository.
+
 ### Paths
 Notebooks read the dataset directories from environment variables (falling back to
 `data/raw/<resolution>/`):

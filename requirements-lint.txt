@@ -1,0 +1,7 @@
+# Exact versions for the lightweight CI lint/type-check job.
+# Keep these aligned with the corresponding entries in requirements.lock.
+black==26.5.1
+flake8==7.3.0
+mypy==1.13.0
+PyYAML==6.0.1
+types-PyYAML==6.0.12.20260906

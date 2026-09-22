@@ -98,8 +98,7 @@ jobs:
         run: |
           pytest -m "${{ matrix.marker }}" ${{ matrix.extra_args }} \
             --cov=utils \
-            --cov=scripts/notebookgen \
-            --cov=scripts/validate_notebooks.py \
+            --cov=scripts \
             --cov-report=term-missing \
             --cov-report=xml \
             --junitxml=reports/junit-${{ matrix.name }}.xml

@@ -8,7 +8,7 @@ import pytest
 
 from utils.data_utils import compute_statistics, split_temporal_data, normalize_array
 from utils.data_utils import create_water_mask, extract_year_from_filename
-from utils.data_utils import calculate_water_area, load_geotiff, save_geotiff
+from utils.data_utils import calculate_water_area, load_config, load_geotiff, load_temporal_sequence, save_geotiff
 
 
 class TestComputeStatistics:
@@ -190,3 +190,28 @@ class TestGeoTIFFIO:
         metadata = {"transform": None, "crs": "EPSG:4326", "width": 10, "height": 10, "nodata": 255}
         save_geotiff(arr, out_path, metadata, dtype="uint8")
         assert tmp_path.joinpath("nested", "deep", "mask.tif").exists()
+
+    def test_rejects_non_geotiff_paths(self, tmp_path):
+        with pytest.raises(ValueError, match="GeoTIFF"):
+            load_geotiff(tmp_path / "mask.txt")
+
+    def test_save_rejects_non_2d_arrays(self, tmp_path):
+        with pytest.raises(ValueError, match="two-dimensional"):
+            save_geotiff(np.zeros((2, 2, 1)), tmp_path / "mask.tif", {})
+
+
+class TestInputValidation:
+    def test_config_must_be_yaml_mapping(self, tmp_path):
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("- not-a-mapping\n", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="top-level mapping"):
+            load_config(config_path)
+
+    def test_temporal_pattern_rejects_parent_traversal(self, tmp_path):
+        with pytest.raises(ValueError, match="relative local"):
+            load_temporal_sequence(tmp_path, pattern="../*.tif")
+
+    def test_temporal_years_must_be_integers(self, tmp_path):
+        with pytest.raises(TypeError, match="sequence of integers"):
+            load_temporal_sequence(tmp_path, years=["2020"])

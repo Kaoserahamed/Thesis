@@ -16,6 +16,23 @@ from typing import Tuple, List, Optional, Dict
 import yaml
 
 
+def _require_path(value: str, name: str) -> Path:
+    """Return a non-empty path value or raise a clear input error."""
+    if not isinstance(value, (str, Path)) or not str(value).strip():
+        raise TypeError(f"{name} must be a non-empty path string")
+    return Path(value)
+
+
+def _require_safe_pattern(pattern: str) -> str:
+    """Allow local filename patterns without absolute or parent traversal paths."""
+    if not isinstance(pattern, str) or not pattern.strip():
+        raise ValueError("pattern must be a non-empty string")
+    pattern_path = Path(pattern)
+    if pattern_path.is_absolute() or ".." in pattern_path.parts:
+        raise ValueError("pattern must be a relative local filename pattern")
+    return pattern
+
+
 def load_config(config_path: str = "../config/config.yaml") -> Dict:
     """
     Load configuration from YAML file.
@@ -29,8 +46,13 @@ def load_config(config_path: str = "../config/config.yaml") -> Dict:
     --------
     dict : Configuration dictionary
     """
-    with open(config_path, "r") as f:
+    path = _require_path(config_path, "config_path")
+    if path.suffix.lower() not in {".yaml", ".yml"}:
+        raise ValueError("config_path must point to a YAML file")
+    with path.open("r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
+    if not isinstance(config, dict):
+        raise ValueError("configuration file must contain a top-level mapping")
     return config
 
 
@@ -49,7 +71,10 @@ def load_geotiff(file_path: str) -> Tuple[np.ndarray, Dict]:
         - array: numpy array of shape (H, W)
         - metadata: dictionary containing spatial reference info
     """
-    with rasterio.open(file_path) as src:
+    path = _require_path(file_path, "file_path")
+    if path.suffix.lower() not in {".tif", ".tiff"}:
+        raise ValueError("file_path must point to a GeoTIFF file")
+    with rasterio.open(path) as src:
         array = src.read(1)  # Read first band
         metadata = {
             "transform": src.transform,
@@ -86,8 +111,18 @@ def save_geotiff(
     nodata_value : float, optional
         No data value
     """
+    output = _require_path(output_path, "output_path")
+    if output.suffix.lower() not in {".tif", ".tiff"}:
+        raise ValueError("output_path must point to a GeoTIFF file")
+    if not isinstance(array, np.ndarray) or array.ndim != 2:
+        raise ValueError("array must be a two-dimensional NumPy array")
+    if not isinstance(metadata, dict) or "crs" not in metadata or "transform" not in metadata:
+        raise ValueError("metadata must contain 'crs' and 'transform'")
+    if not isinstance(dtype, str):
+        raise TypeError("dtype must be a NumPy dtype string")
+
     # Ensure output directory exists
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True)
 
     # Set nodata value if not provided
     if nodata_value is None:
@@ -98,7 +133,7 @@ def save_geotiff(
 
     # Create output file
     with rasterio.open(
-        output_path,
+        output,
         "w",
         driver="GTiff",
         height=array.shape[0],
@@ -138,7 +173,15 @@ def load_temporal_sequence(
         - years_list: list of years corresponding to each time step
         - metadata: metadata from first file
     """
-    dir_path = Path(directory)
+    dir_path = _require_path(directory, "directory")
+    if not dir_path.is_dir():
+        raise FileNotFoundError(f"Data directory does not exist: {directory!r}")
+    pattern = _require_safe_pattern(pattern)
+    if years is not None and (
+        not isinstance(years, (list, tuple, set))
+        or not all(isinstance(year, int) and not isinstance(year, bool) for year in years)
+    ):
+        raise TypeError("years must be a sequence of integers")
     files = sorted(dir_path.glob(pattern))
 
     if not files:

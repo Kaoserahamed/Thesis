@@ -169,6 +169,14 @@ def build_catalog(data_dir: str, pattern: str = "*.tif") -> pd.DataFrame:
     contains nothing usable -- so callers can rely on ``df["year"]`` without a
     guard clause.
     """
+    if not isinstance(data_dir, (str, os.PathLike)) or not str(data_dir).strip():
+        raise TypeError("data_dir must be a non-empty path")
+    if not isinstance(pattern, str) or not pattern.strip():
+        raise ValueError("pattern must be a non-empty string")
+    pattern_path = os.path.normpath(pattern)
+    if os.path.isabs(pattern) or pattern_path == ".." or pattern_path.startswith(".." + os.sep):
+        raise ValueError("pattern must be a relative local filename pattern")
+
     files = sorted(glob.glob(os.path.join(data_dir, pattern)))
     records = []
     for filepath in files:
@@ -238,6 +246,15 @@ def create_sequences(
     -------
     X, y, input_years, target_years : np.ndarrays
     """
+    if not isinstance(seq_len, int) or isinstance(seq_len, bool) or seq_len < 1:
+        raise ValueError("seq_len must be a positive integer")
+    if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon < 1:
+        raise ValueError("horizon must be a positive integer")
+    if not isinstance(stride, int) or isinstance(stride, bool) or stride < 1:
+        raise ValueError("stride must be a positive integer")
+    if len(images) != len(years):
+        raise ValueError("images and years must have the same length")
+
     X, y, in_years, tgt_years = [], [], [], []
     stop = len(images) - seq_len - horizon + 1
     for i in range(0, stop, stride):

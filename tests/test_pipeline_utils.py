@@ -200,6 +200,10 @@ class TestBuildCatalog:
         assert list(df.columns) == ["filepath", "filename", "year"]
         assert df["year"].tolist() == []  # must not raise KeyError
 
+    def test_rejects_parent_traversal_pattern(self, tmp_path):
+        with pytest.raises(ValueError, match="relative local"):
+            build_catalog(str(tmp_path), pattern="../*.tif")
+
 
 # ---------------------------------------------------------------------------
 # load_image_stack  (end-to-end, no network / no GEE)
@@ -233,6 +237,23 @@ class TestLoadImageStack:
     def test_empty_directory_raises_rather_than_returning_empty(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             load_image_stack(str(tmp_path))
+
+
+class TestSequenceInputValidation:
+    def test_rejects_non_positive_window_controls(self):
+        images = [np.zeros((2, 2))] * 3
+        years = [2020, 2021, 2022]
+
+        with pytest.raises(ValueError, match="positive integer"):
+            from utils.pipeline_utils import create_sequences
+
+            create_sequences(images, years, seq_len=0)
+
+    def test_rejects_mismatched_images_and_years(self):
+        from utils.pipeline_utils import create_sequences
+
+        with pytest.raises(ValueError, match="same length"):
+            create_sequences([np.zeros((2, 2))], [], seq_len=1)
 
 
 # ---------------------------------------------------------------------------

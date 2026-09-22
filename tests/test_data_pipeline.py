@@ -1,12 +1,14 @@
-"""Tests for the shared data-pipeline helpers that depend on TensorFlow.
+"""Tests for the shared data-pipeline helpers.
 
 * ``create_sequences`` -- overlapping (X, y) window generation
 * ``prepare_split``    -- leakage-proof temporal split (the core reproducibility
   guarantee of the thesis, section 5.3)
 * ``ExperimentConfig`` / ``EXPERIMENT_PRESETS`` -- experiment configuration parity
-* ``seed_everything``  -- reproducibility of RNG
+* ``seed_numpy``       -- NumPy half of the reproducibility guarantee
 
-These tests are skipped automatically when TensorFlow is not installed.
+All of the above live in ``utils.pipeline_utils`` and are pure NumPy, so this
+module runs in the **fast** CI lane with no TensorFlow installed.  Only the
+TensorFlow half of ``seed_everything`` is marked ``requires_tensorflow``.
 """
 
 from __future__ import annotations
@@ -14,22 +16,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.requires_tensorflow
-
-pytest.importorskip("tensorflow", reason="TensorFlow not installed")
-
-from utils.model_utils import (  # noqa: E402
+from utils.pipeline_utils import (
+    DEFAULT_EPOCHS,
     EXPERIMENT_PRESETS,
     ExperimentConfig,
     create_sequences,
     prepare_split,
-    seed_everything,
-    DEFAULT_EPOCHS,
+    seed_numpy,
 )
-
-# ---------------------------------------------------------------------------
-# create_sequences
-# ---------------------------------------------------------------------------
 
 
 class TestCreateSequences:
@@ -73,11 +67,6 @@ class TestCreateSequences:
         assert len(X) == 0
 
 
-# ---------------------------------------------------------------------------
-# prepare_split  (leakage-proof temporal split)
-# ---------------------------------------------------------------------------
-
-
 def _make_split_data(n_samples=20, start_year=2000):
     """Build synthetic X, y and year arrays for split testing."""
     rng = np.random.RandomState(0)
@@ -115,11 +104,9 @@ class TestPrepareSplit:
         """Output arrays must have a trailing channel dimension."""
         X, y, ty, iy = _make_split_data(n_samples=10, start_year=2000)
         X_tr, y_tr, X_val, y_val, X_test, y_test = prepare_split(X, y, ty, iy, cutoff_year=2005)[:6]
-        # X windows keep the sequence axis -> ndim(X) + 1
         for arr in (X_tr, X_val, X_test):
             assert arr.ndim == X.ndim + 1
             assert arr.shape[-1] == 1
-        # y targets have no sequence axis -> ndim(y) + 1
         for arr in (y_tr, y_val, y_test):
             assert arr.ndim == y.ndim + 1
             assert arr.shape[-1] == 1
@@ -141,11 +128,6 @@ class TestPrepareSplit:
         result = prepare_split(X, y, ty, iy, cutoff_year=2010)
         ty_test = result[6]
         assert len(ty_test) == len(result[4])
-
-
-# ---------------------------------------------------------------------------
-# ExperimentConfig / EXPERIMENT_PRESETS
-# ---------------------------------------------------------------------------
 
 
 class TestExperimentPresets:
@@ -187,24 +169,35 @@ class TestExperimentPresets:
         assert cfg.test_label == "Test: 2016-2025"
 
 
-# ---------------------------------------------------------------------------
-# seed_everything
-# ---------------------------------------------------------------------------
-
-
-class TestSeedEverything:
+class TestSeedNumpy:
     def test_reproducible_numpy(self):
         """Same seed -> same numpy random output."""
-        seed_everything(seed=123)
+        seed_numpy(seed=123)
         a = np.random.rand(10)
-        seed_everything(seed=123)
+        seed_numpy(seed=123)
         b = np.random.rand(10)
         np.testing.assert_array_equal(a, b)
 
     def test_different_seeds_differ(self):
         """Different seeds -> different random output."""
-        seed_everything(seed=1)
+        seed_numpy(seed=1)
         a = np.random.rand(100)
-        seed_everything(seed=2)
+        seed_numpy(seed=2)
         b = np.random.rand(100)
         assert not np.array_equal(a, b)
+
+
+class TestSeedEverything:
+    @pytest.mark.requires_tensorflow
+    def test_seeds_tensorflow_too(self):
+        """``seed_everything`` must delegate to ``seed_numpy`` and TF."""
+        tf = pytest.importorskip("tensorflow", reason="TensorFlow not installed")
+        from utils.model_utils import seed_everything
+
+        seed_everything(seed=7)
+        a = np.random.rand(5)
+        tf_a = tf.random.uniform((5,)).numpy()
+
+        seed_everything(seed=7)
+        np.testing.assert_array_equal(a, np.random.rand(5))
+        np.testing.assert_allclose(tf_a, tf.random.uniform((5,)).numpy())

@@ -19,6 +19,7 @@ seaborn, numpy and (optionally) folium.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -29,6 +30,10 @@ import matplotlib
 matplotlib.use("Agg")  # headless-safe; notebooks can override
 import matplotlib.pyplot as plt  # noqa: E402
 
+from .metrics_numpy import dice_np, iou_np  # noqa: E402  (TensorFlow-free)
+
+logger = logging.getLogger(__name__)
+
 try:
     import seaborn as sns
 
@@ -36,7 +41,6 @@ try:
 except ImportError:  # pragma: no cover
     sns = None
 
-# ── Default styling ───────────────────────────────────────────────────────────
 FIG_DPI = 150
 COLOR_EROSION = "#d73027"
 COLOR_ACCRETION = "#4575b4"
@@ -55,12 +59,7 @@ def save_figure(fig, out_path, dpi: int = FIG_DPI) -> None:
     _ensure_dir(out_path.parent)
     fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
-    print(f"  -> {out_path.name}")
-
-
-# =============================================================================
-# 1.  TRAINING CURVES
-# =============================================================================
+    logger.info("saved figure -> %s", out_path.name)
 
 
 def plot_training_curves(history, setup_name: str, seq_len: int, out_path: Optional[str] = None):
@@ -101,11 +100,6 @@ def plot_training_curves(history, setup_name: str, seq_len: int, out_path: Optio
     if out_path:
         save_figure(fig, out_path)
     return fig
-
-
-# =============================================================================
-# 2.  SEQUENCE-LENGTH COMPARISON
-# =============================================================================
 
 
 def plot_sequence_comparison(
@@ -156,11 +150,6 @@ def plot_sequence_comparison(
     return fig
 
 
-# =============================================================================
-# 3.  ACTUAL VS PREDICTED PANELS
-# =============================================================================
-
-
 def plot_predictions(
     y_true,
     y_pred,
@@ -182,8 +171,6 @@ def plot_predictions(
     fig, axes = plt.subplots(n_show, 3, figsize=(15, 4 * n_show))
     if n_show == 1:
         axes = axes[np.newaxis, :]
-
-    from utils.model_utils import iou_np, dice_np
 
     for row, idx in enumerate(indices):
         actual = np.asarray(y_true[idx]).squeeze()
@@ -220,11 +207,6 @@ def plot_predictions(
     return fig
 
 
-# =============================================================================
-# 4.  TEMPORAL AREA TREND
-# =============================================================================
-
-
 def plot_area_trend(
     years: Sequence[int],
     areas: Sequence[float],
@@ -245,11 +227,6 @@ def plot_area_trend(
     if out_path:
         save_figure(fig, out_path)
     return fig
-
-
-# =============================================================================
-# 5.  EROSION / ACCRETION FREQUENCY
-# =============================================================================
 
 
 def compute_change_frequencies(predicted_stack: np.ndarray, baseline: Optional[np.ndarray] = None):
@@ -289,7 +266,6 @@ def compute_change_frequencies(predicted_stack: np.ndarray, baseline: Optional[n
         erosion /= max(T - 1, 1)
         accretion /= max(T - 1, 1)
 
-    # Hydrodynamic instability index  I = 1 - |2 F_w - 1|
     f_water = 1.0 - stack.mean(axis=0)
     instability = 1.0 - np.abs(2 * f_water - 1)
     return erosion, accretion, instability
@@ -326,11 +302,6 @@ def plot_risk_maps(
     if out_path:
         save_figure(fig, out_path)
     return fig
-
-
-# =============================================================================
-# 6.  INTERACTIVE FOLIUM RISK MAP
-# =============================================================================
 
 
 def create_folium_risk_map(
@@ -370,7 +341,6 @@ def create_folium_risk_map(
     m = folium.Map(location=list(centre), zoom_start=zoom, tiles="Esri.WorldImagery")
 
     if bounds is None:
-        # fall back to a modest box around the centre
         s, w = centre[0] - 0.35, centre[1] - 0.35
         n, e = centre[0] + 0.35, centre[1] + 0.35
     else:
@@ -398,5 +368,5 @@ def create_folium_risk_map(
         out_file = Path(out_path)
         _ensure_dir(out_file.parent)
         m.save(str(out_file))
-        print(f"  -> {out_file.name}")
+        logger.info("saved risk map -> %s", out_file.name)
     return m

@@ -1,0 +1,110 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "river-morphology-thesis"
+version = "0.1.0"
+description = "Spatiotemporal deep-learning framework for forecasting river morphological evolution (Padma River case study)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Academic" }
+authors = [
+    {name = "Md. Kaoser Ahamed Anik"},
+    {name = "S. S. Mahmud Turza"},
+]
+keywords = ["tensorflow", "convLSTM", "U-Net", "Swin Transformer", "ViT", "river-morphology", "remote-sensing", "forecasting"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: Free For Educational Use",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+dependencies = [
+    "numpy>=1.24,<2.0",
+    "pandas>=2.0,<3.0",
+    "scipy>=1.10,<2.0",
+    "tensorflow-cpu>=2.15,<2.20",
+    "rasterio>=1.3,<2.0",
+    "opencv-python-headless>=4.8,<5.0",
+    "scikit-image>=0.21,<1.0",
+    "scikit-learn>=1.3,<2.0",
+    "matplotlib>=3.7,<4.0",
+    "seaborn>=0.12,<1.0",
+    "folium>=0.14,<1.0",
+    "PyYAML>=6.0,<7.0",
+    "tqdm>=4.64",
+]
+
+[project.optional-dependencies]
+collection = ["earthengine-api>=0.1.380", "geemap>=0.31"]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "black>=24.3",
+    "flake8>=6.1",
+    "mypy>=1.8",
+    "types-PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kaoserahamed/ThesisFinal"
+Documentation = "https://kaoserahamed.github.io/Thesis/"
+"Bug Tracker" = "https://github.com/kaoserahamed/ThesisFinal/issues"
+
+[tool.thesis]
+# Academic metadata (not part of the PEP 621 core schema).
+institution = "Shahjalal University of Science and Technology"
+department = "Computer Science and Engineering"
+students = [
+    {name = "Md. Kaoser Ahamed Anik", student_id = "2020331019"},
+    {name = "S. S. Mahmud Turza", student_id = "2020331039"},
+]
+
+[tool.setuptools.packages.find]
+include = ["utils*"]
+
+[tool.black]
+# Formatting standard for all Python sources (utils/, scripts/, tests/).
+line-length = 100
+target-version = ["py310", "py311"]
+extend-exclude = '''
+/(
+    archive
+  | data
+  | outputs
+  | \.ipynb_checkpoints
+)/
+'''
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+# -ra : show extra summary for skips/failures, -q : quiet, --strict-markers: catch typos
+addopts = "-ra -q --strict-markers --strict-config"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "slow: tests that build/train models (deselect with '-m \"not slow\"')",
+    "requires_tensorflow: tests that need TensorFlow installed",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["utils", "scripts"]
+omit = ["*/__init__.py", "tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

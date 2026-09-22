@@ -1,0 +1,13 @@
+# ===========================================================================
+# Optional data-collection dependencies (Google Earth Engine)
+# ---------------------------------------------------------------------------
+# Only needed to *download* the satellite composites with the notebooks in
+# ``data_collection/``.  Training, evaluation and prediction do not require
+# them, so they are kept out of the default install to keep CI light.
+#
+#   pip install -r requirements-collection.txt
+#   earthengine authenticate
+# ===========================================================================
+
+earthengine-api>=0.1.380
+geemap>=0.31

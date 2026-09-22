@@ -1,0 +1,40 @@
+# ===========================================================================
+# Runtime dependencies — River Morphology Prediction (Padma River)
+# ---------------------------------------------------------------------------
+# These are the packages actually imported by the reusable code in ``utils/``
+# and by the model / analysis / prediction notebooks.  Compatible upper bounds
+# keep a fresh clone resolving reproducibly.
+#
+#   pip install -r requirements.txt
+#
+# Data-collection (Google Earth Engine) notebooks -> requirements-collection.txt
+# Development / CI tooling                        -> requirements-dev.txt
+# ===========================================================================
+
+# ---- Core scientific computing --------------------------------------------
+numpy>=1.24,<2.0
+pandas>=2.0,<3.0
+scipy>=1.10,<2.0
+
+# ---- Deep learning --------------------------------------------------------
+# The CPU build keeps CI and a fresh clone lightweight.  For CUDA/GPU training
+# install the GPU wheel instead, e.g.:
+#   pip install "tensorflow[and-cuda]>=2.15,<2.20"
+tensorflow-cpu>=2.15,<2.20
+
+# ---- Geospatial / image processing ----------------------------------------
+rasterio>=1.3,<2.0
+opencv-python-headless>=4.8,<5.0
+scikit-image>=0.21,<1.0
+
+# ---- Machine-learning utilities -------------------------------------------
+scikit-learn>=1.3,<2.0
+
+# ---- Visualisation --------------------------------------------------------
+matplotlib>=3.7,<4.0
+seaborn>=0.12,<1.0
+folium>=0.14,<1.0
+
+# ---- Configuration & helpers ----------------------------------------------
+PyYAML>=6.0,<7.0
+tqdm>=4.64

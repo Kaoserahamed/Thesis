@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: junit-${{ matrix.name }}
           path: reports/junit-${{ matrix.name }}.xml
@@ -139,7 +139,7 @@ jobs:
         run: pip install --no-deps dist/*.whl
 
       - name: Upload distribution artefacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/

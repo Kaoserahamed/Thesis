@@ -748,6 +748,9 @@ mlflow ui  # http://localhost:5000
 
 | Document | Description |
 |----------|-------------|
+| [`README.md`](README.md) | This file — overview, getting started, usage examples |
+| [`CHANGELOG.md`](CHANGELOG.md) | Version history and notable changes |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, testing, code quality, commit guidelines |
 | [`docs/predefence_report.md`](docs/predefence_report.md) | Full thesis report (Markdown) |
 | [`docs/methodology.md`](docs/methodology.md) | Methodology summary |
 | [`docs/repository_guide.md`](docs/repository_guide.md) | How every folder/notebook fits together |

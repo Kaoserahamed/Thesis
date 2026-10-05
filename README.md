@@ -280,6 +280,10 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.lock
 ```
 
+**Note:** `requirements.lock` is the **source of truth** for exact dependency versions.
+It pins all transitive dependencies to ensure reproducible builds across environments.
+CI uses this lockfile to guarantee consistent test results.
+
 For **complete local development** (includes testing, linting, type checking):
 
 ```bash

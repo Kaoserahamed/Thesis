@@ -505,6 +505,17 @@ pip-compile --output-file=requirements.lock requirements-dev.txt
 pip install -r requirements.lock
 ```
 
+**Network isolation verification:** Confirm tests run without external dependencies:
+
+```bash
+python scripts/verify_test_isolation.py
+```
+
+This verifies that:
+- MLflow defaults to local file-based tracking (`file:./mlruns`)
+- Tests don't require network access after installation
+- No external databases or services are needed
+
 **CUDA/GPU issues:** The default installation uses `tensorflow-cpu`. For GPU training,
 replace it:
 

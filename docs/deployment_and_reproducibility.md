@@ -636,6 +636,50 @@ mlflow.log_artifact("outputs/iou_vs_L.png", artifact_path="plots")
 mlflow.log_artifact("outputs/metrics.csv", artifact_path="results")
 ```
 
+### MLflow Isolation and Network Independence
+
+**Local-Only Operation:**
+
+By default, MLflow operates entirely locally without network access:
+
+```python
+# Default tracking URI (no network required)
+MLFLOW_TRACKING_URI = "file:./mlruns"
+
+# All tracking data stored locally
+# - Run metadata: ./mlruns/<experiment_id>/<run_id>/meta.yaml
+# - Metrics: ./mlruns/<experiment_id>/<run_id>/metrics/
+# - Artifacts: ./mlruns/<experiment_id>/<run_id>/artifacts/
+```
+
+**Test Suite Isolation:**
+
+The test suite runs completely offline:
+
+1. **No external services required** — tests use in-memory data and temporary directories
+2. **MLflow defaults to local** — `MLFLOW_TRACKING_URI` defaults to `file:./mlruns`
+3. **No network calls** — all dependencies installed during `pip install`
+4. **Verify isolation** — run `python scripts/verify_test_isolation.py`
+
+**Verification Script:**
+
+```bash
+# Verify tests can run without network
+python scripts/verify_test_isolation.py
+
+# Expected output:
+# ✓ MLflow defaults to local file-based tracking
+# ✓ No external service imports in tests
+# ✓ Test fixtures use temporary/local storage
+# ✓ Fast test suite passes without network
+```
+
+This isolation ensures:
+- Tests run on CI without credentials
+- Fresh clones work immediately
+- Experiments are reproducible offline
+- No accidental data leakage to external services
+
 ### Comparing Runs
 
 ```python

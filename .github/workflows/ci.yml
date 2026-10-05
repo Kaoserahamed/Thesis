@@ -60,7 +60,7 @@ jobs:
         include:
           - name: fast
             marker: "not slow"
-            extra_args: "--ignore=tests/test_model_builders.py --cov-fail-under=50"
+            extra_args: "--ignore=tests/test_model_builders.py --cov-fail-under=70"
           - name: models
             marker: "requires_tensorflow"
             extra_args: ""

@@ -234,132 +234,388 @@ ThesisFinal/
 
 ## 🚀 Getting Started
 
+### Prerequisites
+
+- **Python 3.8+** (tested on 3.10 and 3.11)
+- **pip** 20.0 or newer
+- **Git** for cloning the repository
+- **Optional:** Docker for containerized development
+
+### Quick Start (Fresh Clone to Running Tests)
+
+The fastest path from a fresh clone to verified working tests:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Kaoserahamed/Thesis_v02.git
+cd Thesis_v02
+
+# 2. Create a virtual environment (recommended)
+python -m venv venv
+# Activate on Windows:
+venv\Scripts\activate
+# Activate on Linux/macOS:
+source venv/bin/activate
+
+# 3. Install dependencies from the committed lockfile
+python -m pip install --upgrade pip
+python -m pip install -r requirements.lock
+
+# 4. Run the fast test suite to verify installation
+python -m pytest tests/ -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=70
+
+# 5. Optional: Run the full test suite including TensorFlow model builds
+python -m pytest tests/ --cov=utils --cov-report=term-missing
+```
+
+**Expected output:** All tests should pass with ≥70% coverage on the fast lane, confirming that
+the repository is correctly installed and functional.
+
 ### 1. Install dependencies
+
+For **runtime-only** (notebooks, training, inference):
 
 ```bash
 python -m pip install --upgrade pip
 python -m pip install -r requirements.lock
 ```
 
-For a complete local development environment, install the CI and notebook
-dependencies instead:
+For **complete local development** (includes testing, linting, type checking):
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-CI installs the committed [requirements.lock](requirements.lock) file for
-reproducible Python 3.11 builds. Refresh it after changing either dependency
-manifest with:
+The CI pipeline uses the committed [requirements.lock](requirements.lock) for
+reproducible Python 3.11 builds. This lockfile pins all transitive dependencies
+to ensure consistent behavior across environments.
+
+### 2. Refresh the lockfile (maintainers only)
+
+After updating `requirements.txt` or `requirements-dev.txt`, regenerate the lockfile:
 
 ```bash
 python -m pip install pip-tools
 pip-compile --output-file=requirements.lock requirements-dev.txt
 ```
 
-The complete fresh-clone workflow is:
+**Important:** Review lockfile changes as you would any dependency update. The lockfile
+diff shows exactly which packages and versions changed, making security and compatibility
+reviews straightforward.
+
+### 3. Verify the build (comprehensive quality check)
+
+Run the complete build verification workflow that CI uses:
 
 ```bash
-python -m pip install -r requirements.lock
+# Build the distributable package
+python -m pip install build
 python -m build --outdir dist
+
+# Verify the wheel contains all modules
 python scripts/verify_dist.py dist
-python -m pytest tests/ -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=50
+
+# Run the fast test lane with coverage gate
+python -m pytest tests/ -m "not slow" --ignore=tests/test_model_builders.py \
+  --cov=utils --cov=scripts --cov-fail-under=70
+
+# Run the model-building test lane (requires TensorFlow)
+python -m pytest tests/ -m "requires_tensorflow"
 ```
 
-Review lockfile changes as a normal dependency update. Dependabot checks
-Python manifests and GitHub Actions monthly through
-[.github/dependabot.yml](.github/dependabot.yml).
-The lockfile policy and CI freshness check are documented in
-[docs/dependency_management.md](docs/dependency_management.md).
+Or run all quality gates at once:
+
+```bash
+python scripts/ci_local.py --all
+```
 
 ### Container and VS Code setup
 
 The repository includes a CPU-oriented [Dockerfile](Dockerfile) and a
-[devcontainer](.devcontainer/devcontainer.json). The Docker image runs the
-local quality gates by default:
+[devcontainer](.devcontainer/devcontainer.json) for reproducible development environments.
+
+**Build and run the Docker image:**
 
 ```bash
 docker build -t river-morphology-thesis .
 docker run --rm river-morphology-thesis
 ```
 
-To use JupyterLab from the image, override the default command and publish
-port 8888:
+The default command runs the local quality gates (lint, type-check, tests).
+
+**Run JupyterLab in the container:**
 
 ```bash
-docker run --rm -p 8888:8888 river-morphology-thesis \
-  jupyter lab --ip=0.0.0.0 --no-browser
+docker run --rm -p 8888:8888 -v $(pwd):/workspace river-morphology-thesis \
+  jupyter lab --ip=0.0.0.0 --no-browser --allow-root
 ```
 
-VS Code users can open the repository in the Dev Containers extension and
-choose **Reopen in Container**. The container installs `requirements-dev.txt`
-and configures the Python, pytest, linting, and Jupyter extensions.
+Then open the URL shown in the terminal (includes the token).
 
-Copy [.env.example](.env.example) to `.env` when custom data directories are
-needed. `.env` is ignored by Git; never place Earth Engine credentials or
-service-account JSON in it. Authenticate Earth Engine separately with
-`earthengine authenticate` after installing `requirements-collection.txt`.
+**VS Code Dev Containers:**
 
-The seven primary runtime variables are `YEARLY_DIR`, `QUARTERLY_DIR`,
-`BIMONTHLY_DIR`, `MLFLOW_EXPERIMENT_NAME`, `MLFLOW_TRACKING_URI`,
-`THESIS_DISK_FREE_GB`, and `THESIS_ERROR_WEBHOOK_URL`. The template includes
-safe local defaults; the webhook remains empty unless external monitoring is
-configured.
+1. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open the repository in VS Code
+3. Click the green button in the bottom-left corner
+4. Select "Reopen in Container"
 
-### 2. Authenticate Google Earth Engine (data collection only)
+The container automatically installs `requirements-dev.txt` and configures Python,
+pytest, linting, and Jupyter extensions.
+
+### Environment variables and data paths
+
+Copy [.env.example](.env.example) to `.env` if you need custom data directories:
+
+```bash
+cp .env.example .env
+```
+
+**Key environment variables:**
+
+- `YEARLY_DIR`, `QUARTERLY_DIR`, `BIMONTHLY_DIR` — paths to GeoTIFF time series
+- `MLFLOW_TRACKING_URI` — MLflow server URL (defaults to `file:./mlruns`)
+- `MLFLOW_EXPERIMENT_NAME` — experiment name for grouping runs
+- `THESIS_DISK_FREE_GB` — minimum free disk space threshold
+- `THESIS_ERROR_WEBHOOK_URL` — optional webhook for error notifications
+
+**Important:** `.env` is ignored by Git. Never place Earth Engine credentials or
+service-account JSON in it. For data collection notebooks, authenticate separately:
+
+```bash
+pip install -r requirements-collection.txt
+earthengine authenticate
+```
+
+### 4. Authenticate Google Earth Engine (data collection only)
 
 ```bash
 earthengine authenticate
 ```
 
-### 3. Regenerate the notebooks (optional)
+### 5. Regenerate the notebooks (optional)
 
 ```bash
 python scripts/generate_notebooks.py     # (re)write the self-contained notebooks
-python scripts/validate_notebooks.py     # sanity-check them (valid, parseable, self-contained)
+python scripts/validate_notebooks.py     # sanity-check them (valid, parseable, self-consistent)
 ```
 
-## Reproduce results
+## 🔄 Reproduce Results from Scratch
 
-The following sequence regenerates the self-contained notebooks and executes
-one tracked model notebook end to end. It uses the committed Python 3.11 lockfile;
-set the relevant `YEARLY_DIR`, `QUARTERLY_DIR`, or `BIMONTHLY_DIR` before execution.
+The following workflow demonstrates full reproducibility from a fresh clone:
+
+### Step 1: Environment setup
 
 ```bash
-python -m pip install -r requirements.lock
-python scripts/generate_notebooks.py
+# Clone and install
+git clone https://github.com/Kaoserahamed/Thesis_v02.git
+cd Thesis_v02
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.lock
+```
+
+### Step 2: Verify installation
+
+```bash
+# Run fast tests to confirm everything installed correctly
+pytest -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=70
+```
+
+### Step 3: Data preparation
+
+Option A: Use existing data (if you have GeoTIFFs):
+
+```bash
+# Set environment variables pointing to your data
+export YEARLY_DIR=/path/to/yearly_geotiffs
+export QUARTERLY_DIR=/path/to/quarterly_geotiffs
+export BIMONTHLY_DIR=/path/to/bimonthly_geotiffs
+```
+
+Option B: Generate data from Google Earth Engine (requires authentication):
+
+```bash
+pip install -r requirements-collection.txt
+earthengine authenticate
+jupyter notebook data_collection/01_yearly_data_collection.ipynb
+# Run the notebook to export GeoTIFFs from GEE
+```
+
+### Step 4: Run experiments
+
+Execute a single tracked training run with a preset configuration:
+
+Execute a single tracked training run with a preset configuration:
+
+```bash
+python scripts/run_experiment.py \
+  --preset yearly_setup1 \
+  --model attention_unet_convlstm \
+  --seq-len 5 \
+  --seed 42
+```
+
+Or train via notebooks (self-contained, no imports from `utils/`):
+
+```bash
 jupyter nbconvert --to notebook --execute \
   models/yearly/03_yearly_attention_unet_convlstm.ipynb \
   --output executed_yearly_attention_unet_convlstm.ipynb
 ```
 
-Runs use deterministic NumPy/TensorFlow seeding and the experiment presets in
-`utils/pipeline_utils.py`. MLflow writes local run metadata and artifacts to
-`./mlruns` by default; set `MLFLOW_TRACKING_URI` to compare runs through a
-shared tracking server. The one-epoch, data-free wiring check is:
+### Step 5: Verify results
+
+All models use deterministic seeding (`np.random.seed(42)`, `tf.random.set_seed(42)`)
+and the experiment presets defined in `utils/pipeline_utils.py`. MLflow tracks runs
+locally in `./mlruns` by default (ignored by Git).
+
+**Expected IoU for Attention U-Net + ConvLSTM (yearly, Setup 1, L=5):** ~0.70
+
+To view tracked experiments:
+
+```bash
+mlflow ui
+# Open http://localhost:5000 in your browser
+```
+
+### Quick verification without full training
+
+For a fast wiring check (1 epoch, small synthetic data):
 
 ```bash
 python scripts/smoke_train.py
 ```
 
-### 4. Run the test suite (optional)
+This confirms TensorFlow, the model builder, and the training loop work correctly
+without waiting for full convergence.
+
+### Troubleshooting
+
+**Import errors:** Ensure you activated the virtual environment and installed `requirements.lock`.
+
+**Test failures:** The test suite requires specific package versions. If tests fail after
+manual dependency changes, regenerate the lockfile:
+
+```bash
+pip-compile --output-file=requirements.lock requirements-dev.txt
+pip install -r requirements.lock
+```
+
+**CUDA/GPU issues:** The default installation uses `tensorflow-cpu`. For GPU training,
+replace it:
+
+```bash
+pip uninstall tensorflow-cpu
+pip install "tensorflow[and-cuda]>=2.15,<2.20"
+```
+
+**Out of memory:** Reduce `BATCH_SIZE` in the notebook configuration cells (default is 4).
+
+---
+
+## 🧪 Testing & CI
+
+The shared library (`utils/`, `scripts/`) is covered by comprehensive pytest tests.
+Every push to `main` or pull request runs the full quality gate on GitHub Actions.
+
+## 🧪 Testing & CI
+
+The shared library (`utils/`, `scripts/`) is covered by comprehensive pytest tests.
+Every push to `main` or pull request runs the full quality gate on GitHub Actions.
+
+### Run tests locally
+
+**Fast test lane** (unit tests, no TensorFlow model builds, <30s):
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=50  # fast lane + coverage floor
-pytest -m "requires_tensorflow"          # builds all five architectures
+pytest -m "not slow" --ignore=tests/test_model_builders.py \
+  --cov=utils --cov=scripts --cov-fail-under=70
 ```
 
-### 5. Point the notebooks at your data
-
-Every model/analysis notebook resolves the dataset paths from environment variables
-(falling back to `data/raw/<resolution>/`):
+**Model test lane** (builds all 5 architectures, requires TensorFlow):
 
 ```bash
-set YEARLY_DIR=path/to/yearly_masks
-set QUARTERLY_DIR=path/to/quarterly_masks
-set BIMONTHLY_DIR=path/to/bimonthly_masks
+pytest -m "requires_tensorflow"
 ```
+
+**Full test suite with coverage report:**
+
+```bash
+pytest --cov=utils --cov=scripts --cov-report=term-missing --cov-report=html
+# Open htmlcov/index.html to view detailed coverage
+```
+
+**Run all local quality gates** (lint, type-check, tests, notebook validation):
+
+```bash
+python scripts/ci_local.py
+```
+
+**Include build verification and slow tests:**
+
+```bash
+python scripts/ci_local.py --build --all
+```
+
+### CI pipeline structure
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs four parallel jobs:
+
+1. **Lint** — black, flake8, mypy, notebook validation
+2. **Test** — split into fast (70% coverage gate) and model (TensorFlow) lanes
+3. **Build** — create wheel, verify contents, test installation
+4. **Audit** — pip-audit for known vulnerabilities
+
+On successful `main` branch CI, a fifth job deploys the prediction map to GitHub Pages.
+
+### Individual quality gates
+
+Run the same checks CI uses:
+
+```bash
+# Code formatting
+black --check --line-length 100 utils tests scripts
+
+# Linting
+flake8 utils tests scripts
+
+# Type checking
+mypy utils tests scripts
+
+# Notebook validation (structure, no external imports, self-contained)
+python scripts/validate_notebooks.py
+
+# Package build
+python -m build --outdir dist
+python scripts/verify_dist.py dist
+```
+
+### Test markers
+
+Tests are organized by execution time and dependencies:
+
+- `@pytest.mark.slow` — long-running tests (model training, large data)
+- `@pytest.mark.requires_tensorflow` — tests that import TensorFlow
+- No marker — fast unit tests (<1s per test)
+
+**Skip slow tests:**
+
+```bash
+pytest -m "not slow"
+```
+
+**Run only TensorFlow tests:**
+
+```bash
+pytest -m "requires_tensorflow"
+```
+
+### Continuous integration behavior
+
+- **Pull requests:** Run all gates, do not deploy
+- **Push to main:** Run all gates, deploy docs to GitHub Pages on success
+- **Dependabot PRs:** Automatic merge if all tests pass (requires maintainer approval)
 
 ---
 
@@ -368,154 +624,123 @@ set BIMONTHLY_DIR=path/to/bimonthly_masks
 ### Data pipeline
 
 1. **Collection** — yearly / quarterly / bi-monthly composites exported from GEE as 60 m GeoTIFFs
-   in EPSG:4326.
+   in EPSG:4326
 2. **Water detection** — `MNDWI = (Green − SWIR1) / (Green + SWIR1) > 0`; Sentinel-1 VV < −16 dB
-   as cloud-independent fallback.
-3. **Cloud masking** — Landsat `QA_PIXEL` bits 3–4; Sentinel-2 `QA60` bits 10–11.
-4. **Gap filling** — 7 methods; BiConvLSTM is best (IoU = 0.7366).
-5. **Connected-component cleaning** — keep the 3 largest water components, resize to 256×256.
+   as cloud-independent fallback
+3. **Cloud masking** — Landsat `QA_PIXEL` bits 3–4; Sentinel-2 `QA60` bits 10–11
+4. **Gap filling** — 7 methods compared; BiConvLSTM achieves best IoU (0.7366)
+5. **Connected-component cleaning** — keep the 3 largest water components, resize to 256×256
 
 ### Models
 
-The architectures are implemented in `utils/model_utils.py` and **inlined** into each self-contained
-notebook by `scripts/generate_notebooks.py`, so every model notebook runs on its own.
+All architectures are implemented in `utils/model_architectures.py` and inlined into
+self-contained notebooks by `scripts/generate_notebooks.py`.
 
 | Registry key | Architecture |
 |--------------|--------------|
 | `convlstm` | Standalone ConvLSTM |
 | `unet_lstm` | U-Net with ConvLSTM bottleneck |
-| `attention_unet_convlstm` | Attention-gated U-Net with ConvLSTM |
+| `attention_unet_convlstm` | Attention-gated U-Net with ConvLSTM (best for yearly/quarterly) |
 | `swin_st` | Swin spatio-temporal transformer |
 | `vit_st` | ViT / ViViT spatio-temporal model |
 
-- **Loss:** `L_Total = L_BCE + L_Dice`
-- **Optimiser:** Adam, lr = 1e-4, clipnorm = 1.0
+**Training configuration:**
+
+- **Loss:** `L_Total = L_BCE + L_Dice` (validated by ablation study)
+- **Optimizer:** Adam, lr = 1e-4, clipnorm = 1.0
 - **Sequence lengths:** yearly {4,5,6}, quarterly {6,8,10}, bi-monthly {6,9,12}
-- **Strict temporal split:** Setup 1 (train ≤ 2015 / test 2016–2025), Setup 2 (train ≤ 2020 /
-  test 2021–2025)
+- **Temporal split:** Setup 1 (train ≤ 2015 / test 2016–2025), Setup 2 (train ≤ 2020 / test 2021–2025)
 - **Callbacks:** ModelCheckpoint, EarlyStopping (patience 20), ReduceLROnPlateau (patience 7)
+- **Reproducibility:** Fixed seeds (42) for NumPy and TensorFlow
 
 ### Evaluation metrics
 
-IoU, Dice, Precision, Recall and the signed area difference `ΔA = A_pred − A_true` (km²).
+- **Spatial overlap:** IoU, Dice coefficient
+- **Classification:** Precision, Recall
+- **Area change:** Signed difference ΔA = A_pred − A_true (km²)
 
 ### Experiment tracking
 
-Experiments can be recorded locally with MLflow. The default backend writes
-run metadata and artifacts to `./mlruns`, which is ignored by Git. A run can
-capture an `ExperimentConfig`, Keras training history, evaluation metrics, and
-result files without requiring a hosted tracking service:
+MLflow tracks all experiments with reproducible configurations:
 
 ```python
-from utils.pipeline_utils import EXPERIMENT_PRESETS
-from utils.experiment_tracking import enable_keras_autolog, log_config, log_metrics, tracked_run
+from utils.experiment_tracking import tracked_run, enable_keras_autolog, log_metrics
 
-with tracked_run(run_name="yearly-attention-setup1"):
-  enable_keras_autolog()
-  log_config(EXPERIMENT_PRESETS["yearly_setup1"])
-  model.fit(X_train, y_train, validation_data=(X_val, y_val), callbacks=callbacks)
-  log_metrics({"test_iou": test_iou, "test_dice": test_dice})
+with tracked_run(run_name="attention-unet-yearly-setup1"):
+    enable_keras_autolog()
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val))
+    log_metrics({"test_iou": iou, "test_dice": dice})
 ```
 
-Set `MLFLOW_TRACKING_URI` and optionally `MLFLOW_EXPERIMENT_NAME` to send runs
-to a shared MLflow server. Tracking is opt-in; existing notebook workflows
-continue to run without a tracking account.
-
-For a single reproducible, tracked run using a preset:
-
-```bash
-python scripts/run_experiment.py \
-  --preset yearly_setup1 \
-  --model attention_unet_convlstm \
-  --seq-len 4 \
-  --seed 42
-```
-
-The command loads the configured GeoTIFF sequence, applies the preset temporal
-split, trains with deterministic seeding, logs the run and checkpoint to
-MLflow, and writes `metrics.csv` plus `error_analysis.csv` under
-`outputs/runs/`. Set `MLFLOW_TRACKING_URI` to send the same run metadata to a
-shared tracking server.
+**Local tracking:** Runs write to `./mlruns` (Git-ignored)  
+**Shared tracking:** Set `MLFLOW_TRACKING_URI` to a remote MLflow server
 
 ---
 
-## 📖 Usage
+## 📖 Usage Examples
+
+### Data collection
 
 ```bash
-# Data collection
-jupyter notebook data_collection/01_yearly_data_collection.ipynb
+# Authenticate with Google Earth Engine
+pip install -r requirements-collection.txt
+earthengine authenticate
 
-# Gap-filling comparison
+# Export yearly composites
+jupyter notebook data_collection/01_yearly_data_collection.ipynb
+```
+
+### Analysis workflows
+
+```bash
+# Gap-filling method comparison
 jupyter notebook analysis/01_gap_filling_comparison.ipynb
 
 # Ablation study (model configuration sensitivity)
 jupyter notebook analysis/05_ablation_study.ipynb
 
-# Train one architecture (e.g. yearly Attention U-Net+ConvLSTM = 03)
+# Long-term forecast and risk mapping (2026–2040)
+jupyter notebook analysis/02_long_term_prediction.ipynb
+```
+
+### Model training
+
+```bash
+# Single architecture training (yearly Attention U-Net+ConvLSTM)
 jupyter notebook models/yearly/03_yearly_attention_unet_convlstm.ipynb
 
-# Train another architecture at another resolution (e.g. bi-monthly ViT = 05)
-jupyter notebook models/bimonthly/05_bimonthly_vit.ipynb
-
-# Full yearly architecture comparison
+# Full architecture comparison (all 5 models, yearly resolution)
 jupyter notebook models/00_yearly_model_comparison.ipynb
 
-# Long-term forecast + risk map (2026–2040)
-jupyter notebook analysis/02_long_term_prediction.ipynb
+# Different resolution (bi-monthly U-Net+LSTM)
+jupyter notebook models/bimonthly/02_bimonthly_unet_lstm.ipynb
+```
 
-# Statistical analysis of river dynamics
-jupyter notebook results/01_statistical_analysis.ipynb
+### Command-line training
+
+```bash
+# Single tracked experiment with preset configuration
+python scripts/run_experiment.py \
+  --preset yearly_setup1 \
+  --model attention_unet_convlstm \
+  --seq-len 5 \
+  --seed 42
+
+# View tracked runs
+mlflow ui  # http://localhost:5000
 ```
 
 ---
 
 ## 🧩 Design Principles
 
-- **Single source of truth** — every architecture, loss, metric and split lives in
-  `utils/model_utils.py`, so all notebooks and all three temporal resolutions are provably
-  consistent.
-- **No data leakage** — `prepare_split()` asserts that no test year appears in training.
-- **Reproducibility** — `seed_everything(42)` is called before every model build; identical
-  splits are reused across architectures.
-- **Self-contained notebooks** — each model and analysis notebook inlines the full pipeline and can
-  be run on its own; `scripts/generate_notebooks.py` regenerates them from `utils/model_utils.py`.
-
----
-
-## 🧪 Testing & CI
-
-The shared library is covered by 91 pytest tests, and every push runs
-**black + flake8 + mypy + notebook validation + package build + tests** on GitHub Actions
-(`.github/workflows/ci.yml`).
-
-Pushes to `main` deploy the static prediction map from `docs/` to GitHub Pages
-after linting, tests, and the package build pass. Pull requests run the same
-quality gates but do not deploy.
-
-```bash
-pip install -r requirements-dev.txt
-
-pytest -m "not slow" --ignore=tests/test_model_builders.py --cov=utils --cov-fail-under=50  # fast lane + coverage floor
-pytest -m "requires_tensorflow"          # builds all five architectures
-pytest --cov=utils --cov-report=term-missing
-
-python scripts/ci_local.py               # run the whole gate set locally
-python scripts/ci_local.py --build --all # ... including build + model lane
-```
-
-Individual gates (identical to the CI `lint` job):
-
-```bash
-black --check --line-length 100 utils tests scripts
-flake8 utils tests scripts
-mypy utils tests scripts
-python scripts/validate_notebooks.py     # notebooks: valid, parseable, self-contained
-python -m build && python scripts/verify_dist.py dist   # package builds & wheel is intact
-```
-
-`scripts/validate_notebooks.py` guarantees every generated notebook is valid nbformat JSON, has
-parseable code cells, does not import `model_utils` (it is self-contained), and defines every
-helper it calls.
+- **Single source of truth:** All architectures, losses, and metrics defined in `utils/` — 
+  notebooks inline these for self-containment
+- **No data leakage:** `prepare_split()` validates that test years never appear in training
+- **Reproducibility:** Deterministic seeding (seed=42), committed lockfile, MLflow tracking
+- **Self-contained notebooks:** Each can run independently after code inlining via 
+  `scripts/generate_notebooks.py`
+- **Comprehensive testing:** 70% coverage requirement, fast/slow test separation, CI on every push
 
 ---
 

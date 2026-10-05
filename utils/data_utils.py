@@ -112,6 +112,132 @@ def validate_safe_pattern(pattern: str) -> str:
     return pattern
 
 
+def resolve_safe_path(
+    base_dir: Path,
+    relative_path: str,
+    must_exist: bool = False,
+    allowed_extensions: Optional[List[str]] = None
+) -> Path:
+    """
+    Safely resolve a relative path against a base directory.
+    
+    Prevents directory traversal attacks by ensuring the resolved path
+    stays within the base directory tree.
+    
+    Parameters:
+    -----------
+    base_dir : Path
+        Base directory that resolved path must stay within
+    relative_path : str
+        Relative path to resolve
+    must_exist : bool, optional
+        If True, raise error if path doesn't exist (default: False)
+    allowed_extensions : List[str], optional
+        If provided, enforce that file has one of these extensions
+    
+    Returns:
+    --------
+    Path : Safely resolved absolute path
+    
+    Raises:
+    -------
+    ValueError : If path escapes base directory or has invalid extension
+    FileNotFoundError : If must_exist=True and path doesn't exist
+    
+    Examples:
+    ---------
+    >>> base = Path("/data")
+    >>> resolve_safe_path(base, "yearly/2020.tif")
+    Path('/data/yearly/2020.tif')
+    
+    >>> resolve_safe_path(base, "../etc/passwd")  # Raises ValueError
+    """
+    if not isinstance(base_dir, Path):
+        base_dir = Path(base_dir)
+    
+    if not isinstance(relative_path, (str, Path)) or not str(relative_path).strip():
+        raise ValueError("relative_path must be a non-empty string")
+    
+    # Resolve both paths to absolute
+    base_abs = base_dir.resolve()
+    target = (base_dir / relative_path).resolve()
+    
+    # Ensure target is within base directory
+    try:
+        target.relative_to(base_abs)
+    except ValueError:
+        raise ValueError(
+            f"Path '{relative_path}' escapes base directory '{base_dir}'"
+        )
+    
+    # Check extension if required
+    if allowed_extensions is not None:
+        if target.suffix.lower() not in [ext.lower() for ext in allowed_extensions]:
+            raise ValueError(
+                f"File extension '{target.suffix}' not in allowed list: {allowed_extensions}"
+            )
+    
+    # Check existence if required
+    if must_exist and not target.exists():
+        raise FileNotFoundError(f"Path does not exist: {target}")
+    
+    return target
+
+
+def validate_directory_path(
+    path: str,
+    create_if_missing: bool = False,
+    require_writable: bool = False
+) -> Path:
+    """
+    Validate a directory path with optional creation and permission checks.
+    
+    Parameters:
+    -----------
+    path : str
+        Directory path to validate
+    create_if_missing : bool, optional
+        Create directory if it doesn't exist (default: False)
+    require_writable : bool, optional
+        Check that directory is writable (default: False)
+    
+    Returns:
+    --------
+    Path : Validated directory path
+    
+    Raises:
+    -------
+    TypeError : If path is not a valid string/Path
+    NotADirectoryError : If path exists but is not a directory
+    PermissionError : If require_writable=True and directory is not writable
+    
+    Examples:
+    ---------
+    >>> validate_directory_path("/tmp/output", create_if_missing=True)
+    Path('/tmp/output')
+    """
+    validated_path = validate_path(path, "directory path")
+    
+    if validated_path.exists():
+        if not validated_path.is_dir():
+            raise NotADirectoryError(f"Path exists but is not a directory: {validated_path}")
+    elif create_if_missing:
+        validated_path.mkdir(parents=True, exist_ok=True)
+    else:
+        raise FileNotFoundError(f"Directory does not exist: {validated_path}")
+    
+    # Check writability if required
+    if require_writable:
+        test_file = validated_path / ".write_test"
+        try:
+            test_file.touch()
+            test_file.unlink()
+        except (PermissionError, OSError) as e:
+            raise PermissionError(f"Directory is not writable: {validated_path}") from e
+    
+    return validated_path
+
+
 def load_config(config_path: str = "../config/config.yaml") -> ThesisConfig:
     """
     Load and validate configuration from YAML file.

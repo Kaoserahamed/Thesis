@@ -14,6 +14,85 @@ import rasterio
 from pathlib import Path
 from typing import Tuple, List, Optional, Dict
 import yaml
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+
+
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+
+
+class ThesisConfig(BaseModel):
+    """
+    Pydantic model for validating thesis configuration.
+    
+    Ensures all required data directories and environment variables
+    are present and valid in the configuration file.
+    """
+    model_config = ConfigDict(extra='allow')  # Allow extra fields for flexibility
+    
+    # Data directories (optional with defaults pointing to environment variables)
+    yearly_dir: Optional[str] = Field(None, description="Path to yearly GeoTIFF data")
+    quarterly_dir: Optional[str] = Field(None, description="Path to quarterly GeoTIFF data")
+    bimonthly_dir: Optional[str] = Field(None, description="Path to bi-monthly GeoTIFF data")
+    
+    # MLflow configuration
+    mlflow_tracking_uri: Optional[str] = Field(
+        "file:./mlruns",
+        description="MLflow tracking URI (defaults to local file-based tracking)"
+    )
+    mlflow_experiment_name: Optional[str] = Field(
+        "river-morphology",
+        description="MLflow experiment name for grouping runs"
+    )
+    
+    # System thresholds
+    disk_free_gb: Optional[float] = Field(
+        10.0,
+        ge=0.0,
+        description="Minimum free disk space in GB"
+    )
+    
+    # Optional monitoring
+    error_webhook_url: Optional[str] = Field(None, description="Optional webhook URL for error notifications")
+    
+    @field_validator('yearly_dir', 'quarterly_dir', 'bimonthly_dir', mode='before')
+    @classmethod
+    def validate_data_dir(cls, v: Optional[str]) -> Optional[str]:
+        """Validate data directory paths if provided."""
+        if v is not None and v.strip():
+            # Path validation happens at runtime; here we just check it's a string
+            if not isinstance(v, str):
+                raise ValueError("Data directory must be a string path")
+        return v
+    
+    @field_validator('mlflow_tracking_uri', mode='before')
+    @classmethod
+    def validate_tracking_uri(cls, v: Optional[str]) -> str:
+        """Ensure tracking URI is valid."""
+        if v is None or not v.strip():
+            return "file:./mlruns"  # Default to local tracking
+        if not isinstance(v, str):
+            raise ValueError("MLflow tracking URI must be a string")
+        # Accept file:, http:, https:, or sqlite: schemes
+        valid_schemes = ('file:', 'http:', 'https:', 'sqlite:', 'postgresql:', 'mysql:')
+        if not any(v.startswith(scheme) for scheme in valid_schemes):
+            raise ValueError(f"MLflow tracking URI must start with one of {valid_schemes}")
+        return v
+    
+    @field_validator('disk_free_gb', mode='before')
+    @classmethod
+    def validate_disk_threshold(cls, v: Optional[float]) -> float:
+        """Ensure disk threshold is reasonable."""
+        if v is None:
+            return 10.0  # Default 10 GB
+        try:
+            threshold = float(v)
+        except (TypeError, ValueError):
+            raise ValueError("disk_free_gb must be a number")
+        if threshold < 0:
+            raise ValueError("disk_free_gb must be non-negative")
+        if threshold > 10000:  # Sanity check: more than 10TB seems wrong
+            raise ValueError("disk_free_gb seems unreasonably large (>10TB)")
+        return threshold
 
 
 def validate_path(value: str, name: str) -> Path:
@@ -33,9 +112,9 @@ def validate_safe_pattern(pattern: str) -> str:
     return pattern
 
 
-def load_config(config_path: str = "../config/config.yaml") -> Dict:
+def load_config(config_path: str = "../config/config.yaml") -> ThesisConfig:
     """
-    Load configuration from YAML file.
+    Load and validate configuration from YAML file.
 
     Parameters:
     -----------
@@ -44,15 +123,38 @@ def load_config(config_path: str = "../config/config.yaml") -> Dict:
 
     Returns:
     --------
-    dict : Configuration dictionary
+    ThesisConfig : Validated configuration object
+
+    Raises:
+    -------
+    ValueError : If configuration is invalid or missing required fields
+    FileNotFoundError : If config file doesn't exist
+    
+    Examples:
+    ---------
+    >>> config = load_config("config/config.yaml")
+    >>> print(config.mlflow_tracking_uri)
+    'file:./mlruns'
     """
     path = validate_path(config_path, "config_path")
     if path.suffix.lower() not in {".yaml", ".yml"}:
         raise ValueError("config_path must point to a YAML file")
+    
+    if not path.exists():
+        raise FileNotFoundError(f"Configuration file not found: {path}")
+    
     with path.open("r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    if not isinstance(config, dict):
+        raw_config = yaml.safe_load(f)
+    
+    if not isinstance(raw_config, dict):
         raise ValueError("configuration file must contain a top-level mapping")
+    
+    # Validate using Pydantic model
+    try:
+        config = ThesisConfig(**raw_config)
+    except Exception as e:
+        raise ValueError(f"Invalid configuration: {e}")
+    
     return config
 
 

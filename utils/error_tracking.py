@@ -43,6 +43,81 @@ _DEFAULT_BUFFER = 1000
 _WEBHOOK_TIMEOUT_SECONDS = 2.0
 
 
+# ============================================================================
+# Structured Exception Classes
+# ============================================================================
+
+
+class ThesisError(Exception):
+    """Base exception for all thesis-specific errors."""
+    
+    def __init__(self, message: str, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.message = message
+        self.context = context or {}
+
+
+class DataLoadError(ThesisError):
+    """Raised when data loading or validation fails."""
+    
+    def __init__(self, message: str, filepath: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.filepath = filepath
+
+
+class ConfigurationError(ThesisError):
+    """Raised when configuration is invalid or incomplete."""
+    
+    def __init__(self, message: str, field: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.field = field
+
+
+class ModelBuildError(ThesisError):
+    """Raised when model building or compilation fails."""
+    
+    def __init__(self, message: str, model_name: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.model_name = model_name
+
+
+class TrainingError(ThesisError):
+    """Raised when training fails or is interrupted."""
+    
+    def __init__(self, message: str, epoch: Optional[int] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.epoch = epoch
+
+
+class PredictionError(ThesisError):
+    """Raised when prediction/inference fails."""
+    
+    def __init__(self, message: str, sample_id: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.sample_id = sample_id
+
+
+class ValidationError(ThesisError):
+    """Raised when data validation fails."""
+    
+    def __init__(self, message: str, validation_type: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.validation_type = validation_type
+
+
+class ResourceError(ThesisError):
+    """Raised when system resources are insufficient."""
+    
+    def __init__(self, message: str, resource_type: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+        super().__init__(message, context)
+        self.resource_type = resource_type
+
+
+# ============================================================================
+# Error Tracking
+# ============================================================================
+
+
 @dataclass
 class ErrorRecord:
     """A single captured error instance."""

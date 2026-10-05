@@ -3,18 +3,44 @@ updates:
   - package-ecosystem: pip
     directory: "/"
     schedule:
-      interval: monthly
-    open-pull-requests-limit: 5
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Dhaka
+    open-pull-requests-limit: 10
     labels:
       - dependencies
       - python
     versioning-strategy: increase-if-necessary
+    reviewers:
+      - Kaoserahamed
+    commit-message:
+      prefix: deps
+      prefix-development: deps(dev)
+      include: scope
+    # Group minor/patch updates to reduce PR volume
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: monthly
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Dhaka
     open-pull-requests-limit: 5
     labels:
       - dependencies
       - ci
+      - github-actions
+    reviewers:
+      - Kaoserahamed
+    commit-message:
+      prefix: ci
+      include: scope

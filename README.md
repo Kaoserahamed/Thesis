@@ -751,6 +751,7 @@ mlflow ui  # http://localhost:5000
 | [`docs/predefence_report.md`](docs/predefence_report.md) | Full thesis report (Markdown) |
 | [`docs/methodology.md`](docs/methodology.md) | Methodology summary |
 | [`docs/repository_guide.md`](docs/repository_guide.md) | How every folder/notebook fits together |
+| [`docs/deployment_and_reproducibility.md`](docs/deployment_and_reproducibility.md) | Deployment workflows, CI/CD, dependency management, reproducibility guarantees |
 | `docs/Thesis_Paper.pdf` | Complete thesis document |
 
 ---

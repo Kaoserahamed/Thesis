@@ -238,6 +238,154 @@ def validate_directory_path(
     return validated_path
 
 
+def validate_image_data(
+    data: np.ndarray,
+    expected_shape: Optional[Tuple[int, ...]] = None,
+    expected_dtype: Optional[np.dtype] = None,
+    value_range: Optional[Tuple[float, float]] = None,
+    allow_nan: bool = False,
+    check_finite: bool = True,
+) -> None:
+    """
+    Validate image data array for common issues.
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        Image data to validate
+    expected_shape : tuple, optional
+        Expected shape (height, width) or (height, width, channels)
+    expected_dtype : np.dtype, optional
+        Expected data type (e.g., np.float32, np.uint8)
+    value_range : tuple, optional
+        Expected (min, max) value range
+    allow_nan : bool
+        Whether NaN values are allowed (default: False)
+    check_finite : bool
+        Whether to check for infinite values (default: True)
+    
+    Raises:
+    -------
+    TypeError : If data is not a numpy array
+    ValueError : If validation fails
+    
+    Examples:
+    ---------
+    >>> data = np.random.rand(256, 256).astype(np.float32)
+    >>> validate_image_data(data, expected_shape=(256, 256), value_range=(0, 1))
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError(f"Expected numpy array, got {type(data)}")
+    
+    # Check dimensionality
+    if data.ndim < 2 or data.ndim > 3:
+        raise ValueError(
+            f"Image data must be 2D (H, W) or 3D (H, W, C), got {data.ndim}D with shape {data.shape}"
+        )
+    
+    # Check shape
+    if expected_shape is not None:
+        if data.shape != expected_shape:
+            raise ValueError(
+                f"Shape mismatch: expected {expected_shape}, got {data.shape}"
+            )
+    
+    # Check dtype
+    if expected_dtype is not None:
+        if data.dtype != expected_dtype:
+            raise ValueError(
+                f"Data type mismatch: expected {expected_dtype}, got {data.dtype}"
+            )
+    
+    # Check for NaN values
+    if not allow_nan and np.any(np.isnan(data)):
+        nan_count = np.sum(np.isnan(data))
+        raise ValueError(f"Image contains {nan_count} NaN values")
+    
+    # Check for infinite values
+    if check_finite and np.any(np.isinf(data)):
+        inf_count = np.sum(np.isinf(data))
+        raise ValueError(f"Image contains {inf_count} infinite values")
+    
+    # Check value range
+    if value_range is not None:
+        min_val, max_val = value_range
+        data_min = np.nanmin(data) if allow_nan else np.min(data)
+        data_max = np.nanmax(data) if allow_nan else np.max(data)
+        
+        if data_min < min_val or data_max > max_val:
+            raise ValueError(
+                f"Values out of range [{min_val}, {max_val}]: "
+                f"found min={data_min:.4f}, max={data_max:.4f}"
+            )
+
+
+def normalize_image_data(
+    data: np.ndarray,
+    target_range: Tuple[float, float] = (0.0, 1.0),
+    clip_outliers: bool = False,
+    percentile_range: Optional[Tuple[float, float]] = None,
+) -> np.ndarray:
+    """
+    Normalize image data to a target range.
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        Image data to normalize
+    target_range : tuple
+        Target (min, max) range (default: (0, 1))
+    clip_outliers : bool
+        Whether to clip outliers before normalization (default: False)
+    percentile_range : tuple, optional
+        If clip_outliers=True, clip to (lower_percentile, upper_percentile)
+        Default: (1, 99)
+    
+    Returns:
+    --------
+    np.ndarray : Normalized image data
+    
+    Examples:
+    ---------
+    >>> data = np.random.randint(0, 255, (256, 256), dtype=np.uint8)
+    >>> normalized = normalize_image_data(data, target_range=(0, 1))
+    >>> assert 0 <= normalized.min() <= normalized.max() <= 1
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError(f"Expected numpy array, got {type(data)}")
+    
+    # Make a copy to avoid modifying original
+    data = data.astype(np.float32)
+    
+    # Clip outliers if requested
+    if clip_outliers:
+        if percentile_range is None:
+            percentile_range = (1.0, 99.0)
+        lower, upper = percentile_range
+        p_low = np.percentile(data, lower)
+        p_high = np.percentile(data, upper)
+        data = np.clip(data, p_low, p_high)
+    
+    # Get current range
+    data_min = np.min(data)
+    data_max = np.max(data)
+    
+    # Avoid division by zero
+    if data_max - data_min < 1e-8:
+        # Constant image, map to middle of target range
+        target_min, target_max = target_range
+        return np.full_like(data, (target_min + target_max) / 2)
+    
+    # Normalize to [0, 1]
+    normalized = (data - data_min) / (data_max - data_min)
+    
+    # Scale to target range
+    target_min, target_max = target_range
+    normalized = normalized * (target_max - target_min) + target_min
+    
+    return normalized
+
+
 def load_config(config_path: str = "../config/config.yaml") -> ThesisConfig:
     """
     Load and validate configuration from YAML file.

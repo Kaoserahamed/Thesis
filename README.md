@@ -110,6 +110,29 @@ folder on every push to `main`).
 
 ---
 
+## 🔬 Ablation Study
+
+To validate the design choices behind the best-performing model (Attention U-Net + ConvLSTM), we
+conducted a systematic ablation study varying one factor at a time:
+
+| Factor | Variants Tested | Finding |
+|--------|-----------------|---------|
+| **Loss Function** | Combined (BCE + Dice), Dice-only, BCE-only | Combined loss provides best balance between pixel-level accuracy and region-level overlap |
+| **Sequence Length** | L ∈ {3, 5, 7, 10} | Performance peaks at L=5–7; longer sequences may introduce noise |
+| **Dropout Regularization** | With (0.2) vs. without | Dropout prevents overfitting given limited training data (<40 observations) |
+| **Learning Rate** | 1e-3, 1e-4, 1e-5 | 1e-4 provides stable convergence; 1e-3 causes instability, 1e-5 too slow |
+| **Attention Mechanism** | With vs. without attention gates | Attention gates provide measurable IoU/Dice improvements |
+
+**Key findings:** The baseline configuration (combined loss, L=5, dropout=0.2, LR=1e-4, with
+attention) represents a well-balanced choice across all tested dimensions. Removing any component
+degrades performance, confirming each design decision contributes meaningfully to the final model.
+
+All ablation experiments are tracked in MLflow with reproducible seeding and visualized in
+`analysis/05_ablation_study.ipynb`. Results are saved to `outputs/ablation/ablation_results.csv`
+for further analysis.
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -174,7 +197,8 @@ ThesisFinal/
 │   ├── 01_gap_filling_comparison.ipynb
 │   ├── 02_long_term_prediction.ipynb
 │   ├── 03_short_term_prediction.ipynb
-│   └── 04_quarterly_prediction.ipynb
+│   ├── 04_quarterly_prediction.ipynb
+│   └── 05_ablation_study.ipynb      # Systematic model configuration sensitivity analysis
 │
 ├── results/
 │   └── 01_statistical_analysis.ipynb
@@ -423,6 +447,9 @@ jupyter notebook data_collection/01_yearly_data_collection.ipynb
 
 # Gap-filling comparison
 jupyter notebook analysis/01_gap_filling_comparison.ipynb
+
+# Ablation study (model configuration sensitivity)
+jupyter notebook analysis/05_ablation_study.ipynb
 
 # Train one architecture (e.g. yearly Attention U-Net+ConvLSTM = 03)
 jupyter notebook models/yearly/03_yearly_attention_unet_convlstm.ipynb
